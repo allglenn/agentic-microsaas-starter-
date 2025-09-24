@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from database import get_db, engine, Base
 from models import User, Agent, Task, ApiCall
 import logging
+# Workflow imports will be added inline
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -216,6 +217,101 @@ async def get_api_calls_analytics(
         "success_rate": (successful_calls / total_calls * 100) if total_calls > 0 else 0,
         "average_duration_ms": round(avg_duration, 2)
     }
+
+# Workflow Endpoints
+@app.post("/workflows/execute")
+async def execute_workflow(
+    workflow_id: str,
+    variables: Optional[dict] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Execute a workflow"""
+    try:
+        # Import workflow engine
+        from workflow_agents import workflow_engine
+        
+        instance_id = await workflow_engine.execute_workflow(
+            workflow_id=workflow_id,
+            variables=variables or {},
+            user_id=str(current_user.id)
+        )
+        
+        return {
+            "message": "Workflow execution started",
+            "instance_id": instance_id
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error executing workflow: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/workflows/instances/{instance_id}/status")
+async def get_workflow_status(instance_id: str):
+    """Get workflow instance status"""
+    try:
+        from workflow_agents import workflow_engine
+        
+        instance = workflow_engine.get_workflow_status(instance_id)
+        if not instance:
+            raise HTTPException(status_code=404, detail="Workflow instance not found")
+        
+        # Calculate progress
+        workflow = workflow_engine.workflows.get(instance.workflow_id)
+        total_steps = len(workflow.steps) if workflow else 0
+        completed_steps = len([r for r in instance.results.values() if r is not None])
+        progress = (completed_steps / total_steps * 100) if total_steps > 0 else 0
+        
+        return {
+            "instance_id": instance.id,
+            "status": instance.status.value,
+            "current_step": instance.current_step,
+            "progress": progress,
+            "started_at": instance.started_at,
+            "completed_at": instance.completed_at,
+            "results": instance.results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting workflow status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/workflows/templates")
+async def list_workflow_templates():
+    """List available workflow templates"""
+    try:
+        templates = [
+            {
+                "id": "customer_support_workflow",
+                "name": "Customer Support Workflow",
+                "description": "Automated customer support with escalation",
+                "category": "customer_service",
+                "step_count": 4
+            },
+            {
+                "id": "content_creation_workflow",
+                "name": "Content Creation Workflow",
+                "description": "Automated content creation with review process",
+                "category": "content_marketing",
+                "step_count": 5
+            },
+            {
+                "id": "data_analysis_workflow",
+                "name": "Data Analysis Workflow",
+                "description": "Automated data analysis with insights generation",
+                "category": "data_analytics",
+                "step_count": 5
+            }
+        ]
+        
+        return templates
+        
+    except Exception as e:
+        logger.error(f"Error listing workflow templates: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

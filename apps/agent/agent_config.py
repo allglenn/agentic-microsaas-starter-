@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 # Agent system configuration
 AGENT_SYSTEM_CONFIG = {
-    # Choose agent system: 'simple' or 'enhanced'
+    # Choose agent system: 'simple', 'enhanced', or 'workflow'
     'default_system': os.getenv('AGENT_SYSTEM', 'enhanced'),
     
     # Fallback configuration
@@ -35,6 +35,16 @@ AGENT_SYSTEM_CONFIG = {
         'max_tokens': int(os.getenv('ENHANCED_AGENT_MAX_TOKENS', '1000')),
         'memory_type': os.getenv('ENHANCED_AGENT_MEMORY_TYPE', 'buffer'),
         'tool_timeout': int(os.getenv('ENHANCED_AGENT_TOOL_TIMEOUT', '30'))
+    },
+    
+    # Workflow agent settings (configurable via environment variables)
+    'workflow_agent': {
+        'model': os.getenv('WORKFLOW_AGENT_MODEL', 'gpt-4'),
+        'temperature': float(os.getenv('WORKFLOW_AGENT_TEMPERATURE', '0.3')),
+        'max_tokens': int(os.getenv('WORKFLOW_AGENT_MAX_TOKENS', '2000')),
+        'max_steps': int(os.getenv('WORKFLOW_AGENT_MAX_STEPS', '10')),
+        'parallel_execution': os.getenv('WORKFLOW_AGENT_PARALLEL', 'true').lower() == 'true',
+        'human_in_loop': os.getenv('WORKFLOW_AGENT_HUMAN_IN_LOOP', 'false').lower() == 'true'
     }
 }
 
@@ -45,6 +55,10 @@ def get_agent_system() -> str:
 def should_use_enhanced_agent() -> bool:
     """Check if enhanced agent should be used"""
     return get_agent_system() == 'enhanced'
+
+def should_use_workflow_agent() -> bool:
+    """Check if workflow agent should be used"""
+    return get_agent_system() == 'workflow'
 
 def should_fallback_to_simple() -> bool:
     """Check if fallback to simple agent is enabled"""
@@ -57,6 +71,8 @@ def get_agent_config(system_type: str = None) -> Dict[str, Any]:
     
     if system_type == 'simple':
         return AGENT_SYSTEM_CONFIG['simple_agent']
+    elif system_type == 'workflow':
+        return AGENT_SYSTEM_CONFIG['workflow_agent']
     else:
         return AGENT_SYSTEM_CONFIG['enhanced_agent']
 

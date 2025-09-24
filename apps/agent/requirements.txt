@@ -14,3 +14,7 @@ python-dotenv==1.0.0
 pydantic==2.5.0
 faiss-cpu==1.7.4
 tiktoken==0.5.2
+
+# LangGraph Dependencies (For Advanced Workflows)
+langgraph==0.0.20
+langgraph-checkpoint==0.0.1
