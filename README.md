@@ -4,7 +4,9 @@ A comprehensive, production-ready microsaas boilerplate with AI agents, modern w
 
 ## 🚀 Features
 
-- **🤖 AI Agents**: Intelligent task processing with OpenAI integration
+- **🤖 Dual Agent System**: Simple agents (fast, lightweight) and Enhanced agents (advanced LangChain features)
+- **🧠 Advanced AI Capabilities**: Memory, tools, multi-step reasoning, document processing
+- **⚙️ Fully Configurable**: Environment-driven settings with no hardcoded values
 - **🌐 Modern Web App**: Next.js 14 with TypeScript, Tailwind CSS, and authentication
 - **⚡ Fast API**: High-performance FastAPI backend with async support
 - **🗄️ Database**: PostgreSQL with pgvector for semantic search
@@ -71,6 +73,15 @@ A comprehensive, production-ready microsaas boilerplate with AI agents, modern w
    - API Docs: http://localhost:8000/docs
    - Database: localhost:5432
 
+5. **Configure Agent System** (optional):
+   ```bash
+   # Copy agent environment template
+   cp apps/agent/.env.example apps/agent/.env
+   
+   # Edit agent configuration
+   # Choose between 'simple' or 'enhanced' agent system
+   ```
+
 ### Environment Variables
 
 Create a `.env` file with:
@@ -82,6 +93,24 @@ REDIS_URL=redis://localhost:6379/0
 
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key_here
+
+# Agent System Configuration
+AGENT_SYSTEM=enhanced                    # 'simple' or 'enhanced'
+AGENT_TIMEOUT_SECONDS=30                 # Global timeout
+AGENT_MAX_RETRIES=3                      # Retry attempts
+
+# Simple Agent Settings
+SIMPLE_AGENT_MODEL=gpt-3.5-turbo
+SIMPLE_AGENT_TEMPERATURE=0.7
+SIMPLE_AGENT_MAX_TOKENS=1000
+SIMPLE_AGENT_TIMEOUT=30
+
+# Enhanced Agent Settings
+ENHANCED_AGENT_MODEL=gpt-3.5-turbo
+ENHANCED_AGENT_TEMPERATURE=0.7
+ENHANCED_AGENT_MAX_TOKENS=1000
+ENHANCED_AGENT_MEMORY_TYPE=buffer
+ENHANCED_AGENT_TOOL_TIMEOUT=30
 
 # Google Cloud
 GOOGLE_CLOUD_PROJECT=agentic-microsaas
@@ -183,7 +212,14 @@ docker-compose up -d
 ├── apps/
 │   ├── web/           # Next.js frontend
 │   ├── api/           # FastAPI backend
-│   └── agent/         # Celery worker
+│   └── agent/         # Celery worker with dual agent system
+│       ├── simple_agent.py      # Simple agent (no LangChain)
+│       ├── enhanced_agents.py   # Enhanced agent (with LangChain)
+│       ├── agent_config.py      # Configuration management
+│       ├── agent_configs.py     # Specialized agent types
+│       ├── .env.example         # Environment configuration
+│       ├── AGENT_COMPARISON.md  # Agent system comparison
+│       └── CONFIGURATION.md     # Configuration guide
 ├── infra/
 │   └── terraform/     # Infrastructure as code
 │       ├── modules/   # Reusable Terraform modules
@@ -241,6 +277,7 @@ make cr.deploy.prod   # Deploy to production
 - `POST /agents` - Create agent
 - `GET /agents` - List user agents
 - `GET /agents/{id}` - Get agent details
+- `GET /agents/types` - Get available agent types and configurations
 
 ### Tasks
 - `POST /tasks` - Create task
@@ -252,22 +289,94 @@ make cr.deploy.prod   # Deploy to production
 
 ## 🤖 AI Agents
 
-The platform supports intelligent AI agents that can:
+The platform supports **two types of intelligent AI agents**:
 
+### 🚀 Simple Agents (Fast & Lightweight)
+- **Direct OpenAI API integration**
+- **Minimal dependencies** (5 packages vs 15+)
+- **Fast startup** (~1 second vs ~3 seconds)
+- **Low memory usage** (~50MB vs ~200MB)
+- **Quick responses** (2-5 seconds vs 5-15 seconds)
+
+### 🧠 Enhanced Agents (Advanced LangChain Features)
+- **Conversation memory** and context retention
+- **Tool integration** (database, calculator, email, files)
+- **Multi-step reasoning** with sequential chains
+- **Document processing** with vector search
+- **Specialized agent types** (customer support, content writer, data analyst)
+
+### Agent Capabilities
+
+Both agent types can:
 - Process natural language tasks
 - Make decisions based on context
 - Integrate with external APIs
 - Learn from user interactions
+- Handle complex multi-step workflows
 
 ### Creating an Agent
 
+#### Simple Agent
 ```python
 agent_data = {
-    "name": "Customer Support Agent",
-    "description": "Handles customer inquiries",
-    "prompt": "You are a helpful customer support agent..."
+    "name": "Quick Support Agent",
+    "description": "Fast customer support",
+    "prompt": "You are a helpful customer support agent...",
+    "agent_type": "basic",
+    "model_type": "gpt-3.5-turbo",
+    "temperature": 0.7,
+    "max_tokens": 1000
 }
 ```
+
+#### Enhanced Agent
+```python
+agent_data = {
+    "name": "Advanced Support Agent",
+    "description": "Customer support with memory and tools",
+    "prompt": "You are a helpful customer support agent...",
+    "agent_type": "conversational",
+    "model_type": "gpt-4",
+    "temperature": 0.3,
+    "max_tokens": 2000,
+    "specialties": ["customer_support", "troubleshooting"]
+}
+```
+
+### Agent Configuration
+
+All agent settings are **fully configurable** via environment variables:
+
+```env
+# Choose agent system
+AGENT_SYSTEM=enhanced                    # 'simple' or 'enhanced'
+
+# Simple agent settings
+SIMPLE_AGENT_MODEL=gpt-3.5-turbo
+SIMPLE_AGENT_TEMPERATURE=0.7
+SIMPLE_AGENT_MAX_TOKENS=1000
+
+# Enhanced agent settings
+ENHANCED_AGENT_MODEL=gpt-4
+ENHANCED_AGENT_TEMPERATURE=0.3
+ENHANCED_AGENT_MAX_TOKENS=2000
+```
+
+### Available Agent Types
+
+- **Customer Support**: Empathetic, solution-focused
+- **Content Writer**: Creative, SEO-optimized content
+- **Data Analyst**: Analytical, insight-driven
+- **Research Assistant**: Document processing, fact-checking
+- **Code Assistant**: Programming help and debugging
+
+### Agent System Documentation
+
+For detailed information about the agent systems:
+
+- **[Agent Comparison Guide](apps/agent/AGENT_COMPARISON.md)** - Detailed comparison between simple and enhanced agents
+- **[Configuration Guide](apps/agent/CONFIGURATION.md)** - Complete configuration documentation
+- **[Agent Service README](apps/agent/README.md)** - Agent service documentation
 
 ## 📊 Monitoring
 
