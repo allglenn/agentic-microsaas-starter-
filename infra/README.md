@@ -1,6 +1,6 @@
 # Infrastructure (Terraform)
 
-Infrastructure as Code for deploying the Agentic MicroSaaS platform to Google Cloud Platform.
+Infrastructure as Code for deploying the Agentic MicroSaaS platform to Google Cloud Platform with **environment separation** (dev, staging, prod).
 
 ## 🚀 Features
 
@@ -64,38 +64,65 @@ Infrastructure as Code for deploying the Agentic MicroSaaS platform to Google Cl
 
 ## 🚀 Deployment
 
-### 1. Initialize Terraform
+### Environment-Specific Deployment
+
+The infrastructure is now organized into separate environments with different configurations:
+
+#### **Development Environment**
 
 ```bash
-cd infra/terraform
-terraform init
+# 1. Initialize Terraform for development
+make tf.init.dev
+
+# 2. Plan deployment
+make tf.plan.dev
+
+# 3. Apply configuration
+make tf.apply.dev
+
+# 4. Deploy applications
+make cr.deploy.dev
 ```
 
-### 2. Plan Deployment
+#### **Staging Environment**
 
 ```bash
-terraform plan -var='project_id=agentic-microsaas' -var='region=europe-west1'
+# 1. Initialize Terraform for staging
+make tf.init.staging
+
+# 2. Plan deployment
+make tf.plan.staging
+
+# 3. Apply configuration
+make tf.apply.staging
+
+# 4. Deploy applications
+make cr.deploy.staging
 ```
 
-### 3. Apply Configuration
+#### **Production Environment**
 
 ```bash
-terraform apply -var='project_id=agentic-microsaas' -var='region=europe-west1'
+# 1. Initialize Terraform for production
+make tf.init.prod
+
+# 2. Plan deployment
+make tf.plan.prod
+
+# 3. Apply configuration
+make tf.apply.prod
+
+# 4. Deploy applications
+make cr.deploy.prod
 ```
 
-### 4. Deploy Applications
+### Environment Configuration
 
-```bash
-# Build and push container images
-gcloud builds submit --tag gcr.io/agentic-microsaas/web apps/web
-gcloud builds submit --tag gcr.io/agentic-microsaas/api apps/api
-gcloud builds submit --tag gcr.io/agentic-microsaas/agent apps/agent
+Each environment has its own configuration:
 
-# Deploy to Cloud Run
-gcloud run deploy web --image gcr.io/agentic-microsaas/web --region=europe-west1 --allow-unauthenticated
-gcloud run deploy api --image gcr.io/agentic-microsaas/api --region=europe-west1
-gcloud run deploy agent --image gcr.io/agentic-microsaas/agent --region=europe-west1
-```
+- **Development**: Small instances, public IPs, no deletion protection
+- **Staging**: Medium instances, private IPs, staging-specific settings
+- **Production**: Large instances, high availability, monitoring, deletion protection
 
 ## 📁 Infrastructure Components
 

@@ -95,23 +95,78 @@ NEXTAUTH_URL=http://localhost:3000
 API_SECRET_KEY=your_api_secret_key_here
 ```
 
+### Environment Configuration Setup
+
+For cloud deployment, configure environment-specific variables:
+
+1. **Copy environment templates**:
+   ```bash
+   cp infra/terraform/environments/dev/terraform.tfvars.example infra/terraform/environments/dev/terraform.tfvars
+   cp infra/terraform/environments/staging/terraform.tfvars.example infra/terraform/environments/staging/terraform.tfvars
+   cp infra/terraform/environments/prod/terraform.tfvars.example infra/terraform/environments/prod/terraform.tfvars
+   ```
+
+2. **Edit each environment file** with your specific values:
+   - Database passwords
+   - API keys and secrets
+   - OAuth credentials
+   - Alert email addresses (production)
+
 ## 🚀 Deployment
 
 ### Google Cloud Platform
 
+The infrastructure supports **environment separation** with dev, staging, and production configurations.
+
+#### **Development Environment**
+
 1. **Initialize Terraform**:
    ```bash
-   make tf.init
+   make tf.init.dev
    ```
 
 2. **Deploy infrastructure**:
    ```bash
-   make tf.apply
+   make tf.apply.dev
    ```
 
 3. **Deploy services**:
    ```bash
-   make cr.deploy
+   make cr.deploy.dev
+   ```
+
+#### **Staging Environment**
+
+1. **Initialize Terraform**:
+   ```bash
+   make tf.init.staging
+   ```
+
+2. **Deploy infrastructure**:
+   ```bash
+   make tf.apply.staging
+   ```
+
+3. **Deploy services**:
+   ```bash
+   make cr.deploy.staging
+   ```
+
+#### **Production Environment**
+
+1. **Initialize Terraform**:
+   ```bash
+   make tf.init.prod
+   ```
+
+2. **Deploy infrastructure**:
+   ```bash
+   make tf.apply.prod
+   ```
+
+3. **Deploy services**:
+   ```bash
+   make cr.deploy.prod
    ```
 
 ### Docker Compose
@@ -131,6 +186,14 @@ docker-compose up -d
 │   └── agent/         # Celery worker
 ├── infra/
 │   └── terraform/     # Infrastructure as code
+│       ├── modules/   # Reusable Terraform modules
+│       │   ├── database/  # Database and Redis
+│       │   ├── compute/   # Cloud Run services
+│       │   └── storage/   # Cloud Storage
+│       └── environments/  # Environment-specific configs
+│           ├── dev/       # Development environment
+│           ├── staging/   # Staging environment
+│           └── prod/      # Production environment
 ├── docker-compose.yml # Local development
 └── Makefile          # Development commands
 ```
@@ -149,12 +212,23 @@ make agent.dev
 # Database operations
 make sql.init
 
-# Terraform operations
-make tf.init
-make tf.apply
+# Terraform operations (Environment-specific)
+make tf.init.dev      # Initialize development
+make tf.init.staging  # Initialize staging
+make tf.init.prod     # Initialize production
 
-# Cloud Run deployment
-make cr.deploy
+make tf.plan.dev      # Plan development changes
+make tf.plan.staging  # Plan staging changes
+make tf.plan.prod     # Plan production changes
+
+make tf.apply.dev     # Apply development changes
+make tf.apply.staging # Apply staging changes
+make tf.apply.prod    # Apply production changes
+
+# Cloud Run deployment (Environment-specific)
+make cr.deploy.dev    # Deploy to development
+make cr.deploy.staging # Deploy to staging
+make cr.deploy.prod   # Deploy to production
 ```
 
 ## 🧪 API Endpoints
@@ -214,13 +288,21 @@ Built-in monitoring includes:
 
 ## 🚀 Production Considerations
 
-- Use environment-specific configurations
-- Set up proper secret management
-- Configure monitoring and alerting
-- Set up backup strategies
-- Implement proper logging
-- Use HTTPS everywhere
-- Set up CI/CD pipelines
+### Environment-Specific Configurations
+
+- **Development**: Small instances, public IPs, no deletion protection
+- **Staging**: Medium instances, private IPs, staging-specific settings
+- **Production**: Large instances, high availability, monitoring, deletion protection
+
+### Security & Operations
+
+- Use environment-specific secret management
+- Configure monitoring and alerting (production includes automated alerts)
+- Set up backup strategies with automated retention policies
+- Implement proper logging with structured output
+- Use HTTPS everywhere with proper SSL certificates
+- Set up CI/CD pipelines for automated deployments
+- Implement proper IAM roles and permissions per environment
 
 ## 📝 License
 
