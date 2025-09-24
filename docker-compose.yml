@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: agentic_microsaas
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c shared_preload_libraries=vector
+      -c max_connections=200
+      -c shared_buffers=256MB
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/agentic_microsaas
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./apps/api:/app
+    depends_on:
+      - postgres
+      - redis
+
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/agentic_microsaas
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./apps/agent:/app
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
