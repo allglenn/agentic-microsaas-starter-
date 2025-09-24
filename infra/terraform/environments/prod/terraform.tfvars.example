@@ -1,0 +1,24 @@
+# Production Environment Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+project_id = "agentic-microsaas-prod"
+region     = "europe-west1"
+
+# Database
+db_password = "your_secure_password_here"
+
+# Authentication
+nextauth_secret = "your_nextauth_secret_here"
+google_client_id = "your_google_client_id_here"
+google_client_secret = "your_google_client_secret_here"
+
+# API
+api_secret_key = "your_api_secret_key_here"
+openai_api_key = "your_openai_api_key_here"
+
+# Container Registry
+registry_url = "gcr.io"
+image_tag    = "latest"
+
+# Monitoring
+alert_email = "alerts@yourdomain.com"
