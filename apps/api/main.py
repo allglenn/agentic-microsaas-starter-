@@ -54,6 +54,11 @@ class AgentCreate(BaseModel):
     name: str
     description: Optional[str] = None
     prompt: str
+    agent_type: Optional[str] = "basic"
+    model_type: Optional[str] = "gpt-3.5-turbo"
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 1000
+    specialties: Optional[List[str]] = []
 
 class AgentResponse(BaseModel):
     id: str
@@ -134,6 +139,16 @@ async def create_agent(agent: AgentCreate, current_user: User = Depends(get_curr
     db.commit()
     db.refresh(db_agent)
     return db_agent
+
+# Get available agent types
+@app.get("/agents/types")
+async def get_agent_types():
+    from agent_configs import get_available_agent_types, get_agent_config
+    agent_types = get_available_agent_types()
+    return {
+        "agent_types": agent_types,
+        "configs": {agent_type: get_agent_config(agent_type) for agent_type in agent_types}
+    }
 
 @app.get("/agents", response_model=List[AgentResponse])
 async def get_agents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

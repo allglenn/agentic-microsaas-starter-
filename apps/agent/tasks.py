@@ -1,9 +1,6 @@
 import openai
 import os
 from typing import Dict, Any
-from langchain.llms import OpenAI
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
 import logging
 from database import get_db
 from models import Task, Agent
@@ -14,46 +11,64 @@ logger = logging.getLogger(__name__)
 # Configure OpenAI
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def process_task(task: Task, agent: Agent) -> str:
-    """Process a task using the specified agent"""
+def process_task(task: Task, agent: Agent, use_enhanced: bool = True) -> str:
+    """Process a task using either simple or enhanced agent system"""
     try:
-        # Initialize LLM
-        llm = OpenAI(
-            temperature=0.7,
-            max_tokens=1000,
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
-        
-        # Create prompt template
-        prompt_template = PromptTemplate(
-            input_variables=["task_title", "task_description", "agent_prompt"],
-            template="""
-            You are an AI agent with the following characteristics:
-            {agent_prompt}
+        if use_enhanced:
+            return _process_with_enhanced_agent(task, agent)
+        else:
+            return _process_with_simple_agent(task, agent)
             
-            Task to complete:
-            Title: {task_title}
-            Description: {task_description}
-            
-            Please provide a detailed response to complete this task.
-            """
-        )
-        
-        # Create chain
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        
-        # Process the task
-        result = chain.run(
-            task_title=task.title,
-            task_description=task.description or "",
-            agent_prompt=agent.prompt
-        )
-        
-        logger.info(f"Task processed successfully: {task.id}")
-        return result
-        
     except Exception as e:
         logger.error(f"Error processing task {task.id}: {str(e)}")
+        return f"Error processing task: {str(e)}"
+
+def _process_with_enhanced_agent(task: Task, agent: Agent) -> str:
+    """Process task with enhanced LangChain agent"""
+    try:
+        from enhanced_agents import create_agent_from_config
+        from agent_config import create_agent_config_from_env_and_db
+        
+        # Create agent configuration from environment and database
+        agent_config = create_agent_config_from_env_and_db(agent.id, 'enhanced')
+        agent_config.update({
+            'prompt': agent.prompt,
+            'type': 'basic'
+        })
+        
+        # Create enhanced agent
+        enhanced_agent = create_agent_from_config(agent_config)
+        
+        # Prepare context
+        context = {
+            'user_info': f"User ID: {task.user_id}",
+            'system_status': 'operational'
+        }
+        
+        # Process the task
+        result = enhanced_agent.process_task(task, context)
+        
+        logger.info(f"Task processed successfully with enhanced agent: {task.id}")
+        return result
+        
+    except ImportError:
+        logger.warning("Enhanced agents not available, falling back to simple agent")
+        return _process_with_simple_agent(task, agent)
+    except Exception as e:
+        logger.error(f"Error with enhanced agent: {str(e)}")
+        return _process_with_simple_agent(task, agent)
+
+def _process_with_simple_agent(task: Task, agent: Agent) -> str:
+    """Process task with simple agent (no LangChain)"""
+    try:
+        from simple_agent import process_task_simple
+        return process_task_simple(task, agent)
+        
+    except ImportError:
+        logger.error("Simple agent not available")
+        return "Error: No agent system available"
+    except Exception as e:
+        logger.error(f"Error with simple agent: {str(e)}")
         return f"Error processing task: {str(e)}"
 
 def update_task_status(task_id: str, status: str):

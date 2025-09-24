@@ -56,8 +56,10 @@ def process_agent_task(self, task_id: str):
         # Update task status to processing
         update_task_status(task_id, "processing")
         
-        # Process the task
-        result = process_task(task, agent)
+        # Process the task with configured agent system
+        from agent_config import should_use_enhanced_agent
+        use_enhanced = should_use_enhanced_agent()
+        result = process_task(task, agent, use_enhanced=use_enhanced)
         
         # Update task with result
         task.status = "completed"

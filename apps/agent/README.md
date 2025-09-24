@@ -1,339 +1,359 @@
-# Agent Service (Celery Worker)
+# Agent Service (Enhanced LangChain)
 
-Background task processing service using Celery with AI agent capabilities and OpenAI integration.
+Advanced AI agent processing service using Celery with enhanced LangChain capabilities, memory, tools, and specialized agent types.
 
-## 🚀 Features
+## 🚀 Enhanced Features
 
-- **Celery Workers** for background task processing
-- **OpenAI Integration** with LangChain
-- **Task Queue Management** with Redis
-- **Performance Monitoring** and metrics
-- **Error Handling** with retry logic
-- **Database Integration** for task tracking
+- **Advanced LangChain Integration**: Memory, tools, chains, and agents
+- **Specialized Agent Types**: Customer support, content writer, data analyst, etc.
+- **Memory Management**: Conversation history and context awareness
+- **Tool Integration**: Database search, calculations, email, file operations
+- **Document Processing**: Vector search and retrieval capabilities
+- **Multi-Step Reasoning**: Sequential chains for complex tasks
+- **Agent Factory**: Pre-configured specialized agents
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Task Queue    │    │  Enhanced Agent │    │   LangChain     │
+│   (Celery)      │───▶│   System        │───▶│   Components    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │   Memory &      │
+         │                       │              │   Context       │
+         │                       │              └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Database      │    │   Tools &       │    │   OpenAI API    │
+│   (PostgreSQL)  │    │   Functions     │    │   (GPT-4/3.5)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## 🤖 Agent Types
+
+### **1. Customer Support Agent**
+- **Type**: Conversational with memory
+- **Model**: GPT-3.5-turbo
+- **Features**: Empathetic responses, issue escalation, follow-up
+- **Specialties**: Billing, technical support, complaints
+
+### **2. Content Writer Agent**
+- **Type**: Basic chain
+- **Model**: GPT-4
+- **Features**: SEO optimization, audience adaptation, creative writing
+- **Specialties**: Blog posts, social media, marketing copy
+
+### **3. Data Analyst Agent**
+- **Type**: Tool-enabled
+- **Model**: GPT-4
+- **Features**: Data analysis, insights, recommendations
+- **Specialties**: Sales analysis, user behavior, reporting
+
+### **4. Research Assistant Agent**
+- **Type**: Sequential chain
+- **Model**: GPT-4
+- **Features**: Multi-step research, source verification
+- **Specialties**: Market research, fact checking, summarization
+
+## 🔧 Enhanced Capabilities
+
+### **Memory Management**
+```python
+# Conversation memory
+memory = ConversationBufferWindowMemory(k=5)  # Remember last 5 interactions
+
+# Context-aware processing
+context = {
+    'user_info': 'User ID: 123',
+    'previous_tasks': 'Recent billing inquiry',
+    'system_status': 'operational'
+}
+```
+
+### **Tool Integration**
+```python
+tools = [
+    Tool(name="Database Search", func=search_database),
+    Tool(name="Calculator", func=calculate),
+    Tool(name="Send Email", func=send_email),
+    Tool(name="File Operations", func=file_operations)
+]
+```
+
+### **Multi-Step Reasoning**
+```python
+# Sequential chain for complex tasks
+sequential_chain = SequentialChain(
+    chains=[analysis_chain, execution_chain],
+    input_variables=["task"],
+    output_variables=["analysis", "result"]
+)
+```
+
+### **Document Processing**
+```python
+# Vector search and retrieval
+vectorstore = FAISS.from_documents(documents, embeddings)
+retrieval_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=vectorstore.as_retriever()
+)
+```
+
+## 📊 Agent Configuration
+
+### **Basic Configuration**
+```python
+agent_config = {
+    'name': 'Customer Support Agent',
+    'type': 'conversational',
+    'model_type': 'gpt-3.5-turbo',
+    'temperature': 0.3,
+    'max_tokens': 1000,
+    'memory_type': 'window',
+    'prompt': 'You are a helpful customer support agent...'
+}
+```
+
+### **Advanced Configuration**
+```python
+advanced_config = {
+    'type': 'tool_enabled',
+    'model_type': 'gpt-4',
+    'temperature': 0.2,
+    'tools': ['database', 'calculator', 'email'],
+    'memory_type': 'buffer',
+    'specialties': ['data_analysis', 'reporting']
+}
+```
+
+## 🚀 Usage Examples
+
+### **Creating Specialized Agents**
+```python
+# Customer support agent
+support_agent = SpecializedAgentFactory.create_customer_support_agent()
+
+# Content writer agent
+writer_agent = SpecializedAgentFactory.create_content_writer_agent()
+
+# Data analyst agent
+analyst_agent = SpecializedAgentFactory.create_data_analyst_agent()
+```
+
+### **Processing Tasks**
+```python
+# Process with context
+result = agent.process_task(task, context={
+    'user_info': 'VIP customer',
+    'previous_tasks': 'Recent purchase',
+    'system_status': 'operational'
+})
+```
+
+### **Document-Aware Processing**
+```python
+# Research agent with documents
+research_agent = DocumentAwareAgent(config, documents_path="docs/")
+result = research_agent.process_with_documents("What are the latest AI trends?")
+```
+
+## 🔄 Task Processing Flow
+
+### **1. Task Creation**
+```python
+task = Task(
+    title="Customer Inquiry",
+    description="Billing issue with recent charge",
+    agent_id="customer-support-agent",
+    user_id="user123"
+)
+```
+
+### **2. Agent Selection**
+```python
+# System automatically selects appropriate agent
+agent = create_agent_from_config(agent_config)
+```
+
+### **3. Context Preparation**
+```python
+context = {
+    'user_info': get_user_info(task.user_id),
+    'previous_tasks': get_recent_tasks(task.user_id),
+    'system_status': get_system_status()
+}
+```
+
+### **4. Task Processing**
+```python
+# Enhanced processing with memory and tools
+result = agent.process_task(task, context)
+```
+
+### **5. Result Storage**
+```python
+task.status = "completed"
+task.result = result
+db.commit()
+```
 
 ## 🛠️ Development
 
-### Prerequisites
-
-- Python 3.11+
-- Redis server
-- PostgreSQL database
-- OpenAI API key
-
-### Setup
-
-1. **Install dependencies**:
-   ```bash
-   cd apps/agent
-   pip install -r requirements.txt
-   ```
-
-2. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Start Redis server**:
-   ```bash
-   redis-server
-   ```
-
-4. **Start Celery worker**:
-   ```bash
-   celery -A worker worker --loglevel=info
-   ```
-
-## 📁 Project Structure
-
-```
-apps/agent/
-├── worker.py           # Celery application and tasks
-├── tasks.py            # Task processing logic
-├── database.py         # Database configuration
-├── models.py           # Database models
-├── monitoring.py       # Performance monitoring
-└── requirements.txt    # Python dependencies
+### **Setup**
+```bash
+cd apps/agent
+pip install -r requirements.txt
 ```
 
-## 🤖 AI Agent Capabilities
+### **Start Worker**
+```bash
+celery -A worker worker --loglevel=info
+```
 
-### Task Processing
-
-The agent service processes various types of tasks:
-
-- **Natural Language Processing**: Text analysis and generation
-- **Decision Making**: Context-based decision processing
-- **API Integration**: External service interactions
-- **Data Processing**: Structured data manipulation
-
-### OpenAI Integration
-
+### **Test Agent**
 ```python
-# Example agent task processing
-def process_task(task: Task, agent: Agent) -> str:
-    llm = OpenAI(temperature=0.7, max_tokens=1000)
-    prompt_template = PromptTemplate(
-        input_variables=["task_title", "task_description", "agent_prompt"],
-        template="Agent prompt: {agent_prompt}\nTask: {task_title}\nDescription: {task_description}"
-    )
-    chain = LLMChain(llm=llm, prompt=prompt_template)
-    result = chain.run(
-        task_title=task.title,
-        task_description=task.description,
-        agent_prompt=agent.prompt
-    )
-    return result
+from enhanced_agents import SpecializedAgentFactory
+
+# Create and test agent
+agent = SpecializedAgentFactory.create_customer_support_agent()
+result = agent.process_task(test_task)
+print(result)
 ```
 
-## 🔧 Celery Configuration
+## 📈 Performance Features
 
-### Worker Configuration
+### **Memory Optimization**
+- Conversation buffer with configurable window size
+- Context compression for long conversations
+- Memory persistence across sessions
 
+### **Tool Efficiency**
+- Lazy loading of tools
+- Caching of tool results
+- Parallel tool execution
+
+### **Model Selection**
+- Automatic model selection based on task complexity
+- Cost optimization with model switching
+- Performance monitoring per model
+
+## 🔒 Security Features
+
+### **Input Validation**
+- Task content sanitization
+- Prompt injection prevention
+- Rate limiting per user
+
+### **Tool Security**
+- Sandboxed tool execution
+- Permission-based tool access
+- Audit logging for tool usage
+
+### **Data Protection**
+- Sensitive data filtering
+- Context encryption
+- Secure memory storage
+
+## 📊 Monitoring
+
+### **Agent Performance**
 ```python
-celery_app = Celery(
-    'agentic_worker',
-    broker=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
-    backend=os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-)
-
-celery_app.conf.update(
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
-    timezone='UTC',
-    enable_utc=True,
-    task_track_started=True,
-    task_time_limit=30 * 60,  # 30 minutes
-    task_soft_time_limit=25 * 60,  # 25 minutes
-    worker_prefetch_multiplier=1,
-    worker_max_tasks_per_child=1000,
-)
+# Track agent metrics
+metrics = {
+    'success_rate': 0.95,
+    'avg_response_time': '2.3 minutes',
+    'user_satisfaction': 4.8,
+    'tool_usage': {'database': 45, 'email': 12}
+}
 ```
 
-### Task Definition
-
+### **Memory Usage**
 ```python
-@celery_app.task(bind=True)
-def process_agent_task(self, task_id: str):
-    """Process a task using an AI agent"""
-    try:
-        # Get task and agent from database
-        # Process task with AI
-        # Update task status
-        return {"status": "completed", "result": result}
-    except Exception as e:
-        # Handle errors and update status
-        return {"status": "error", "message": str(e)}
+# Monitor memory consumption
+memory_stats = {
+    'conversation_count': 150,
+    'memory_size': '2.3MB',
+    'hit_rate': 0.87
+}
 ```
 
-## 📊 Monitoring & Metrics
+## 🚀 Deployment
 
-### Task Execution Monitoring
-
-```python
-@monitor_task_execution("agent_task")
-def process_agent_task(task_id: str):
-    # Task processing logic
-    pass
+### **Local Development**
+```bash
+make agent.dev
 ```
 
-### Performance Metrics
+### **Production**
+```bash
+# Start multiple workers
+celery -A worker worker --loglevel=info --concurrency=4
 
-- **Task Duration**: Execution time tracking
-- **Success Rate**: Task completion statistics
-- **Error Rate**: Failure tracking and analysis
-- **Queue Length**: Pending task monitoring
-
-### Logging
-
-```python
-logger.info(f"Starting task processing for task_id: {task_id}")
-logger.info(f"Task completed successfully: {task_id}")
-logger.error(f"Task failed: {task_id} - {error_message}")
+# With supervisor
+supervisord -c supervisord.conf
 ```
 
-## 🗄️ Database Integration
-
-### Task Status Updates
-
-```python
-def update_task_status(task_id: str, status: str):
-    """Update task status in database"""
-    db = next(get_db())
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if task:
-        task.status = status
-        db.commit()
-```
-
-### Task Creation
-
-```python
-def create_agent_task(task_data: Dict[str, Any]) -> str:
-    """Create a new agent task and queue it for processing"""
-    db = next(get_db())
-    task = Task(
-        title=task_data["title"],
-        description=task_data.get("description"),
-        agent_id=task_data["agent_id"],
-        user_id=task_data["user_id"],
-        status="pending"
-    )
-    db.add(task)
-    db.commit()
-    
-    # Queue task for processing
-    process_agent_task.delay(task.id)
-    return task.id
+### **Docker**
+```bash
+docker build -t agent-service .
+docker run agent-service
 ```
 
 ## 🔧 Configuration
 
-### Environment Variables
-
+### **Environment Variables**
 ```env
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
 # Database
 DATABASE_URL=postgresql://user:password@localhost:5432/agentic_microsaas
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Celery
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
+# Agent Settings
+DEFAULT_MODEL=gpt-3.5-turbo
+MAX_TOKENS=1000
+DEFAULT_TEMPERATURE=0.7
 ```
 
-### Celery Settings
-
+### **Agent Settings**
 ```python
-# Task routing
-task_routes = {
-    'worker.process_agent_task': {'queue': 'agent_tasks'},
-    'worker.health_check': {'queue': 'system'},
+# Global agent settings
+AGENT_SETTINGS = {
+    'default_model': 'gpt-3.5-turbo',
+    'max_tokens': 1000,
+    'temperature': 0.7,
+    'memory_window': 5,
+    'tool_timeout': 30
 }
-
-# Task serialization
-task_serializer = 'json'
-accept_content = ['json']
-result_serializer = 'json'
-
-# Time limits
-task_time_limit = 30 * 60  # 30 minutes
-task_soft_time_limit = 25 * 60  # 25 minutes
 ```
 
-## 🚀 Deployment
+## 🎯 Best Practices
 
-### Local Development
+### **Agent Design**
+- Use appropriate model for task complexity
+- Implement proper error handling
+- Monitor performance metrics
+- Regular prompt optimization
 
-```bash
-# Start Celery worker
-celery -A worker worker --loglevel=info
+### **Memory Management**
+- Limit conversation history
+- Compress old memories
+- Implement memory cleanup
+- Monitor memory usage
 
-# Start Celery beat (for scheduled tasks)
-celery -A worker beat --loglevel=info
+### **Tool Integration**
+- Validate tool inputs
+- Handle tool failures gracefully
+- Implement tool timeouts
+- Log tool usage
 
-# Start Celery flower (monitoring)
-celery -A worker flower
-```
-
-### Production
-
-```bash
-# Start multiple workers
-celery -A worker worker --loglevel=info --concurrency=4
-
-# Start with supervisor
-supervisord -c supervisord.conf
-```
-
-### Docker
-
-```bash
-docker build -t agent-service .
-docker run agent-service
-```
-
-## 🧪 Testing
-
-```bash
-# Run tests
-pytest
-
-# Test specific task
-python -c "from worker import process_agent_task; process_agent_task.delay('test_task_id')"
-```
-
-## 📈 Performance Optimization
-
-### Worker Scaling
-
-- **Horizontal Scaling**: Multiple worker processes
-- **Vertical Scaling**: Increased worker concurrency
-- **Queue Partitioning**: Separate queues for different task types
-
-### Task Optimization
-
-- **Batch Processing**: Process multiple tasks together
-- **Caching**: Cache frequently used data
-- **Connection Pooling**: Optimize database connections
-
-## 🔄 Task Lifecycle
-
-1. **Task Creation**: Task created in database with "pending" status
-2. **Queue Submission**: Task queued in Redis for processing
-3. **Worker Pickup**: Celery worker picks up task from queue
-4. **Processing**: AI agent processes the task
-5. **Status Update**: Task status updated to "completed" or "failed"
-6. **Result Storage**: Task result stored in database
-
-## 🐛 Error Handling
-
-### Retry Logic
-
-```python
-@celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3})
-def process_agent_task(self, task_id: str):
-    try:
-        # Task processing
-        pass
-    except Exception as exc:
-        # Retry with exponential backoff
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
-```
-
-### Error Recovery
-
-- **Automatic Retries**: Failed tasks are automatically retried
-- **Dead Letter Queue**: Permanently failed tasks moved to DLQ
-- **Error Notifications**: Alerts for critical failures
-
-## 🔍 Monitoring Tools
-
-### Celery Flower
-
-Web-based monitoring tool for Celery:
-
-```bash
-celery -A worker flower
-# Access at http://localhost:5555
-```
-
-### Custom Monitoring
-
-```python
-# Task execution metrics
-def log_agent_performance(agent_id: str, task_count: int, avg_duration: float):
-    logger.info(f"Agent performance - ID: {agent_id}, Tasks: {task_count}, Avg Duration: {avg_duration}ms")
-```
-
-## 🔒 Security
-
-- **API Key Management**: Secure OpenAI API key handling
-- **Database Security**: Connection encryption and access control
-- **Task Isolation**: Worker process isolation
-- **Input Validation**: Task data validation and sanitization
+The enhanced LangChain integration makes your agentic microsaas significantly more powerful and capable of handling complex, multi-step tasks with memory, context awareness, and tool integration! 🚀
