@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
 from database import get_db, engine, Base
-from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference
+from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation
 from stripe_service import StripeService
 from email_service import EmailService
+from team_service import TeamService
 import logging
 # Workflow imports will be added inline
 
@@ -177,6 +178,66 @@ class SendEmailRequest(BaseModel):
     subject: str
     html_content: str
     text_content: Optional[str] = None
+
+# Team Management Pydantic models
+class TeamCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class TeamResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    owner_id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TeamMemberResponse(BaseModel):
+    id: str
+    user_id: str
+    user_name: str
+    user_email: str
+    role_id: str
+    role_name: str
+    joined_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TeamInviteRequest(BaseModel):
+    email: str
+    role: str
+
+class TeamInviteResponse(BaseModel):
+    id: str
+    team_id: str
+    invited_email: str
+    role_name: str
+    status: str
+    expires_at: datetime
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class RoleResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    permissions: Optional[List[str]]
+    is_system_role: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class UpdateMemberRoleRequest(BaseModel):
+    user_id: str
+    role: str
 
 # Auth functions
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -538,6 +599,243 @@ async def test_welcome_email(
     except Exception as e:
         logger.error(f"Error sending welcome email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send welcome email")
+
+# Team Management Endpoints
+@app.post("/teams", response_model=TeamResponse)
+async def create_team(
+    request: TeamCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new team"""
+    try:
+        team = TeamService.create_team(
+            name=request.name,
+            description=request.description,
+            owner=current_user,
+            db=db
+        )
+        return team
+    except Exception as e:
+        logger.error(f"Error creating team: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create team")
+
+@app.get("/teams", response_model=List[TeamResponse])
+async def get_user_teams(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all teams the user belongs to"""
+    try:
+        teams = TeamService.get_user_teams(current_user, db)
+        return teams
+    except Exception as e:
+        logger.error(f"Error getting user teams: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get teams")
+
+@app.get("/teams/{team_id}", response_model=TeamResponse)
+async def get_team(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get team details"""
+    try:
+        team = db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        # Check if user is a member
+        if not TeamService.has_permission(current_user.id, team_id, "team:read", db):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return team
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting team: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get team")
+
+@app.get("/teams/{team_id}/members", response_model=List[TeamMemberResponse])
+async def get_team_members(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get team members"""
+    try:
+        # Check permissions
+        if not TeamService.has_permission(current_user.id, team_id, "team:read", db):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        members = TeamService.get_team_members(team_id, db)
+        return members
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting team members: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get team members")
+
+@app.post("/teams/{team_id}/invite", response_model=TeamInviteResponse)
+async def invite_user_to_team(
+    team_id: str,
+    request: TeamInviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Invite a user to join the team"""
+    try:
+        invitation = TeamService.invite_user_to_team(
+            team_id=team_id,
+            invited_email=request.email,
+            role_name=request.role,
+            invited_by=current_user,
+            db=db
+        )
+        
+        return TeamInviteResponse(
+            id=invitation.id,
+            team_id=invitation.team_id,
+            invited_email=invitation.invited_email,
+            role_name=invitation.role.name,
+            status=invitation.status,
+            expires_at=invitation.expires_at,
+            created_at=invitation.created_at
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error inviting user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to invite user")
+
+@app.post("/teams/invitations/{token}/accept")
+async def accept_invitation(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Accept a team invitation"""
+    try:
+        success = TeamService.accept_invitation(token, current_user, db)
+        if success:
+            return {"message": "Invitation accepted successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to accept invitation")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error accepting invitation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to accept invitation")
+
+@app.post("/teams/invitations/{token}/decline")
+async def decline_invitation(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Decline a team invitation"""
+    try:
+        success = TeamService.decline_invitation(token, current_user, db)
+        if success:
+            return {"message": "Invitation declined successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to decline invitation")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error declining invitation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to decline invitation")
+
+@app.put("/teams/{team_id}/members/role")
+async def update_member_role(
+    team_id: str,
+    request: UpdateMemberRoleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a team member's role"""
+    try:
+        success = TeamService.update_member_role(
+            team_id=team_id,
+            user_id=request.user_id,
+            new_role_name=request.role,
+            updated_by=current_user,
+            db=db
+        )
+        if success:
+            return {"message": "Member role updated successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to update member role")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating member role: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update member role")
+
+@app.delete("/teams/{team_id}/members/{user_id}")
+async def remove_member(
+    team_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove a member from the team"""
+    try:
+        success = TeamService.remove_member(
+            team_id=team_id,
+            user_id=user_id,
+            removed_by=current_user,
+            db=db
+        )
+        if success:
+            return {"message": "Member removed successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to remove member")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error removing member: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove member")
+
+@app.get("/teams/{team_id}/invitations", response_model=List[TeamInviteResponse])
+async def get_team_invitations(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get pending invitations for a team"""
+    try:
+        # Check permissions
+        if not TeamService.has_permission(current_user.id, team_id, "team:read", db):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        invitations = TeamService.get_team_invitations(team_id, db)
+        return [
+            TeamInviteResponse(
+                id=inv.id,
+                team_id=inv.team_id,
+                invited_email=inv.invited_email,
+                role_name=inv.role.name,
+                status=inv.status,
+                expires_at=inv.expires_at,
+                created_at=inv.created_at
+            ) for inv in invitations
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting team invitations: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get invitations")
+
+@app.get("/roles", response_model=List[RoleResponse])
+async def get_roles(db: Session = Depends(get_db)):
+    """Get all available roles"""
+    try:
+        roles = db.query(Role).all()
+        return roles
+    except Exception as e:
+        logger.error(f"Error getting roles: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get roles")
 
 # Workflow Endpoints
 @app.post("/workflows/execute")

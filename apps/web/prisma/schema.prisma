@@ -55,6 +55,10 @@ model User {
     Payment       Payment[]
     EmailNotification EmailNotification[]
     EmailPreference  EmailPreference?
+    TeamMembership   TeamMembership[]
+    OwnedTeams       Team[]
+    InvitationsSent  TeamInvitation[] @relation("InvitationsSent")
+    InvitationsReceived TeamInvitation[] @relation("InvitationsReceived")
 }
 
 model VerificationToken {
@@ -202,4 +206,80 @@ model EmailPreference {
     user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     createdAt             DateTime @default(now())
     updatedAt             DateTime @updatedAt
+}
+
+// Team and Role-based Access Control models
+model Team {
+    id            String   @id @default(cuid())
+    name          String
+    description   String?
+    ownerId       String
+    isActive      Boolean  @default(true)
+    settings      Json?
+    owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    memberships   TeamMembership[]
+    invitations   TeamInvitation[]
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+}
+
+model Role {
+    id            String   @id @default(cuid())
+    name          String   @unique
+    description   String?
+    permissions   Json?
+    isSystemRole  Boolean  @default(false)
+    memberships   TeamMembership[]
+    invitations   TeamInvitation[]
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+}
+
+model TeamMembership {
+    id            String   @id @default(cuid())
+    teamId        String
+    userId        String
+    roleId        String
+    joinedAt      DateTime @default(now())
+    isActive      Boolean  @default(true)
+    invitedById   String?
+    team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    invitedBy     User?    @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@unique([teamId, userId])
+}
+
+model TeamInvitation {
+    id              String   @id @default(cuid())
+    teamId          String
+    invitedUserId   String?
+    invitedEmail    String
+    roleId          String
+    invitedById     String
+    token           String   @unique
+    status          String   @default("pending") // pending, accepted, declined, expired, cancelled
+    expiresAt       DateTime
+    acceptedAt      DateTime?
+    declinedAt      DateTime?
+    team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    invitedUser     User?    @relation("InvitationsReceived", fields: [invitedUserId], references: [id], onDelete: SetNull)
+    invitedBy       User     @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: Cascade)
+    role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+}
+
+model Permission {
+    id          String   @id @default(cuid())
+    name        String   @unique
+    description String?
+    resource    String
+    action      String
+    createdAt   DateTime @default(now())
+
+    @@unique([resource, action])
 }

@@ -21,6 +21,10 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
     email_notifications = relationship("EmailNotification", back_populates="user")
     email_preferences = relationship("EmailPreference", back_populates="user", uselist=False)
+    team_memberships = relationship("TeamMembership", back_populates="user")
+    owned_teams = relationship("Team", back_populates="owner")
+    invitations_sent = relationship("TeamInvitation", back_populates="invited_by")
+    invitations_received = relationship("TeamInvitation", back_populates="invited_user", foreign_keys="TeamInvitation.invited_user_id")
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -178,3 +182,93 @@ class EmailPreference(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="email_preferences")
+
+# Team and Role-based Access Control models
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    is_active = Column(Boolean, default=True)
+    settings = Column(JSON, nullable=True)  # Team-specific settings
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    owner = relationship("User", back_populates="owned_teams")
+    memberships = relationship("TeamMembership", back_populates="team")
+    invitations = relationship("TeamInvitation", back_populates="team")
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    permissions = Column(JSON, nullable=True)  # List of permissions
+    is_system_role = Column(Boolean, default=False)  # System roles cannot be deleted
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    memberships = relationship("TeamMembership", back_populates="role")
+
+class TeamMembership(Base):
+    __tablename__ = "team_memberships"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    role_id = Column(String, ForeignKey("roles.id"), nullable=False)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    invited_by_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    team = relationship("Team", back_populates="memberships")
+    user = relationship("User", back_populates="team_memberships")
+    role = relationship("Role", back_populates="memberships")
+    invited_by = relationship("User", foreign_keys=[invited_by_id])
+
+    # Ensure unique user per team
+    __table_args__ = (
+        {"extend_existing": True},
+    )
+
+class TeamInvitation(Base):
+    __tablename__ = "team_invitations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    invited_user_id = Column(String, ForeignKey("users.id"), nullable=True)  # If user exists
+    invited_email = Column(String, nullable=False)  # Email to invite
+    role_id = Column(String, ForeignKey("roles.id"), nullable=False)
+    invited_by_id = Column(String, ForeignKey("users.id"), nullable=False)
+    token = Column(String, unique=True, nullable=False, index=True)
+    status = Column(String, default="pending")  # pending, accepted, declined, expired
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    declined_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    team = relationship("Team", back_populates="invitations")
+    invited_user = relationship("User", back_populates="invitations_received", foreign_keys=[invited_user_id])
+    invited_by = relationship("User", back_populates="invitations_sent", foreign_keys=[invited_by_id])
+    role = relationship("Role")
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    resource = Column(String, nullable=False)  # e.g., "agents", "tasks", "billing"
+    action = Column(String, nullable=False)  # e.g., "create", "read", "update", "delete"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Ensure unique permission per resource-action combination
+    __table_args__ = (
+        {"extend_existing": True},
+    )
