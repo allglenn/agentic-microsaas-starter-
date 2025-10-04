@@ -47,9 +47,9 @@ const handler = NextAuth({
         },
         signIn: async ({ user, account, profile }) => {
             // Allow all social sign-ins
-            if (account?.provider === 'google' || 
-                account?.provider === 'github' || 
-                account?.provider === 'microsoft-entra-id' || 
+            if (account?.provider === 'google' ||
+                account?.provider === 'github' ||
+                account?.provider === 'microsoft-entra-id' ||
                 account?.provider === 'apple') {
                 return true
             }
