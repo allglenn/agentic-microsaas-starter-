@@ -1,17 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
+import json
 from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
 from database import get_db, engine, Base
-from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation
+from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation, File, FileShare, FileUploadSession
 from stripe_service import StripeService
 from email_service import EmailService
 from team_service import TeamService
+from storage_service import StorageService
 import logging
 # Workflow imports will be added inline
 
@@ -238,6 +241,75 @@ class RoleResponse(BaseModel):
 class UpdateMemberRoleRequest(BaseModel):
     user_id: str
     role: str
+
+# File Storage Pydantic models
+class FileUploadRequest(BaseModel):
+    filename: str
+    team_id: Optional[str] = None
+    is_public: bool = False
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class FileResponse(BaseModel):
+    id: str
+    filename: str
+    original_filename: str
+    file_size: int
+    mime_type: str
+    is_public: bool
+    is_encrypted: bool
+    tags: Optional[List[str]]
+    download_count: int
+    last_accessed: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class FileShareRequest(BaseModel):
+    shared_with_user_id: Optional[str] = None
+    shared_with_team_id: Optional[str] = None
+    permission: str = "read"
+    expires_at: Optional[datetime] = None
+
+class FileShareResponse(BaseModel):
+    id: str
+    file_id: str
+    share_token: str
+    permission: str
+    expires_at: Optional[datetime]
+    access_count: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class UploadSessionRequest(BaseModel):
+    filename: str
+    file_size: int
+    mime_type: str
+    chunk_size: int = 1048576
+
+class UploadSessionResponse(BaseModel):
+    id: str
+    session_token: str
+    total_chunks: int
+    chunk_size: int
+    expires_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ChunkUploadRequest(BaseModel):
+    chunk_number: int
+    chunk_data: str  # Base64 encoded
+
+class StorageStatsResponse(BaseModel):
+    total_files: int
+    total_size: int
+    total_size_mb: float
+    mime_types: Dict[str, int]
 
 # Auth functions
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -836,6 +908,284 @@ async def get_roles(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting roles: {e}")
         raise HTTPException(status_code=500, detail="Failed to get roles")
+
+# File Storage Endpoints
+@app.post("/files/upload", response_model=FileResponse)
+async def upload_file(
+    file: UploadFile = File(...),
+    team_id: Optional[str] = Form(None),
+    is_public: bool = Form(False),
+    tags: Optional[str] = Form(None),  # JSON string
+    metadata: Optional[str] = Form(None),  # JSON string
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload a file to Google Cloud Storage"""
+    try:
+        # Parse tags and metadata
+        tags_list = json.loads(tags) if tags else None
+        metadata_dict = json.loads(metadata) if metadata else None
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Upload file
+        storage_service = StorageService()
+        file_record = storage_service.upload_file(
+            file_content=file_content,
+            filename=file.filename,
+            user=current_user,
+            team_id=team_id,
+            is_public=is_public,
+            metadata=metadata_dict,
+            tags=tags_list,
+            db=db
+        )
+        
+        return file_record
+        
+    except Exception as e:
+        logger.error(f"Error uploading file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload file")
+
+@app.get("/files", response_model=List[FileResponse])
+async def get_user_files(
+    team_id: Optional[str] = None,
+    tags: Optional[str] = None,  # Comma-separated tags
+    mime_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's files with optional filtering"""
+    try:
+        storage_service = StorageService()
+        
+        # Parse tags
+        tags_list = tags.split(',') if tags else None
+        
+        files = storage_service.get_user_files(
+            user=current_user,
+            team_id=team_id,
+            tags=tags_list,
+            mime_type=mime_type,
+            limit=limit,
+            offset=offset,
+            db=db
+        )
+        
+        return files
+        
+    except Exception as e:
+        logger.error(f"Error getting user files: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get files")
+
+@app.get("/files/{file_id}", response_model=FileResponse)
+async def get_file_info(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get file information"""
+    try:
+        file_record = db.query(File).filter(File.id == file_id).first()
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Check access
+        storage_service = StorageService()
+        if not storage_service._has_file_access(file_record, current_user, db):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return file_record
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file info: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get file info")
+
+@app.get("/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download a file"""
+    try:
+        storage_service = StorageService()
+        file_content, file_record = storage_service.download_file(file_id, current_user, db)
+        
+        return Response(
+            content=file_content,
+            media_type=file_record.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={file_record.original_filename}",
+                "Content-Length": str(file_record.file_size)
+            }
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error downloading file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download file")
+
+@app.get("/files/{file_id}/url")
+async def get_file_url(
+    file_id: str,
+    expires_in: int = 3600,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a signed URL for file access"""
+    try:
+        storage_service = StorageService()
+        url = storage_service.get_file_url(file_id, current_user, db, expires_in)
+        
+        return {"url": url, "expires_in": expires_in}
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error generating file URL: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate file URL")
+
+@app.delete("/files/{file_id}")
+async def delete_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a file"""
+    try:
+        storage_service = StorageService()
+        success = storage_service.delete_file(file_id, current_user, db)
+        
+        if success:
+            return {"message": "File deleted successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to delete file")
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete file")
+
+@app.post("/files/{file_id}/share", response_model=FileShareResponse)
+async def share_file(
+    file_id: str,
+    request: FileShareRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Share a file with a user or team"""
+    try:
+        storage_service = StorageService()
+        file_share = storage_service.share_file(
+            file_id=file_id,
+            user=current_user,
+            shared_with_user_id=request.shared_with_user_id,
+            shared_with_team_id=request.shared_with_team_id,
+            permission=request.permission,
+            expires_at=request.expires_at,
+            db=db
+        )
+        
+        return file_share
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error sharing file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to share file")
+
+@app.get("/files/shared/{share_token}")
+async def download_shared_file(
+    share_token: str,
+    db: Session = Depends(get_db)
+):
+    """Download a file using a share token"""
+    try:
+        storage_service = StorageService()
+        file_content, file_record = storage_service.get_shared_file(share_token, db)
+        
+        return Response(
+            content=file_content,
+            media_type=file_record.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={file_record.original_filename}",
+                "Content-Length": str(file_record.file_size)
+            }
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error downloading shared file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download shared file")
+
+@app.post("/files/upload/session", response_model=UploadSessionResponse)
+async def create_upload_session(
+    request: UploadSessionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a resumable upload session for large files"""
+    try:
+        storage_service = StorageService()
+        upload_session = storage_service.create_upload_session(
+            filename=request.filename,
+            file_size=request.file_size,
+            mime_type=request.mime_type,
+            user=current_user,
+            chunk_size=request.chunk_size,
+            db=db
+        )
+        
+        return upload_session
+        
+    except Exception as e:
+        logger.error(f"Error creating upload session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create upload session")
+
+@app.post("/files/upload/chunk")
+async def upload_chunk(
+    session_token: str,
+    chunk_number: int,
+    chunk_data: bytes = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a chunk of a file"""
+    try:
+        storage_service = StorageService()
+        result = storage_service.upload_chunk(session_token, chunk_number, chunk_data, db)
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error uploading chunk: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload chunk")
+
+@app.get("/files/stats", response_model=StorageStatsResponse)
+async def get_storage_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get storage statistics for the user"""
+    try:
+        storage_service = StorageService()
+        stats = storage_service.get_storage_stats(current_user, db)
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error getting storage stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get storage stats")
 
 # Workflow Endpoints
 @app.post("/workflows/execute")

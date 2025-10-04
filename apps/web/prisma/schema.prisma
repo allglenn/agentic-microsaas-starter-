@@ -59,6 +59,9 @@ model User {
     OwnedTeams       Team[]
     InvitationsSent  TeamInvitation[] @relation("InvitationsSent")
     InvitationsReceived TeamInvitation[] @relation("InvitationsReceived")
+    Files            File[]
+    FileShares       FileShare[] @relation("FileShares")
+    FileUploadSessions FileUploadSession[]
 }
 
 model VerificationToken {
@@ -219,6 +222,7 @@ model Team {
     owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     memberships   TeamMembership[]
     invitations   TeamInvitation[]
+    files         File[]
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 }
@@ -282,4 +286,79 @@ model Permission {
     createdAt   DateTime @default(now())
 
     @@unique([resource, action])
+}
+
+// File Storage models
+model File {
+    id              String   @id @default(cuid())
+    userId          String
+    teamId          String?
+    filename        String
+    originalFilename String
+    filePath        String
+    fileSize        BigInt
+    mimeType        String
+    fileHash        String
+    isPublic        Boolean  @default(false)
+    isEncrypted     Boolean  @default(false)
+    metadata        Json?
+    tags            Json?
+    downloadCount   Int      @default(0)
+    lastAccessed    DateTime?
+    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+    shares          FileShare[]
+    accessLogs      FileAccessLog[]
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+}
+
+model FileShare {
+    id                String   @id @default(cuid())
+    fileId            String
+    sharedById        String
+    sharedWithUserId  String?
+    sharedWithTeamId  String?
+    shareToken        String   @unique
+    permission        String   @default("read")
+    expiresAt         DateTime?
+    isActive          Boolean  @default(true)
+    accessCount       Int      @default(0)
+    lastAccessed      DateTime?
+    file              File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+    sharedBy          User     @relation("FileShares", fields: [sharedById], references: [id], onDelete: Cascade)
+    sharedWithUser    User?    @relation(fields: [sharedWithUserId], references: [id], onDelete: SetNull)
+    sharedWithTeam    Team?    @relation(fields: [sharedWithTeamId], references: [id], onDelete: SetNull)
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+}
+
+model FileUploadSession {
+    id              String   @id @default(cuid())
+    userId          String
+    sessionToken    String   @unique
+    filename        String
+    fileSize        BigInt
+    mimeType        String
+    chunkSize       Int      @default(1048576)
+    totalChunks     Int
+    uploadedChunks  Json?
+    status          String   @default("pending")
+    expiresAt       DateTime
+    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+}
+
+model FileAccessLog {
+    id          String   @id @default(cuid())
+    fileId      String
+    userId      String?
+    action      String
+    ipAddress   String?
+    userAgent   String?
+    metadata    Json?
+    file        File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+    user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+    createdAt   DateTime @default(now())
 }

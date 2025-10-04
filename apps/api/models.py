@@ -25,6 +25,8 @@ class User(Base):
     owned_teams = relationship("Team", back_populates="owner")
     invitations_sent = relationship("TeamInvitation", back_populates="invited_by")
     invitations_received = relationship("TeamInvitation", back_populates="invited_user", foreign_keys="TeamInvitation.invited_user_id")
+    files = relationship("File", back_populates="user")
+    file_shares = relationship("FileShare", back_populates="shared_by")
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -272,3 +274,85 @@ class Permission(Base):
     __table_args__ = (
         {"extend_existing": True},
     )
+
+# File Storage models
+class File(Base):
+    __tablename__ = "files"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=True)  # Optional team association
+    filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)  # GCS path
+    file_size = Column(BigInteger, nullable=False)
+    mime_type = Column(String, nullable=False)
+    file_hash = Column(String, nullable=False)  # For deduplication
+    is_public = Column(Boolean, default=False)
+    is_encrypted = Column(Boolean, default=False)
+    metadata = Column(JSON, nullable=True)  # Additional file metadata
+    tags = Column(JSON, nullable=True)  # File tags for organization
+    download_count = Column(Integer, default=0)
+    last_accessed = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="files")
+    team = relationship("Team")
+    shares = relationship("FileShare", back_populates="file")
+
+class FileShare(Base):
+    __tablename__ = "file_shares"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    file_id = Column(String, ForeignKey("files.id"), nullable=False)
+    shared_by_id = Column(String, ForeignKey("users.id"), nullable=False)
+    shared_with_user_id = Column(String, ForeignKey("users.id"), nullable=True)  # If shared with specific user
+    shared_with_team_id = Column(String, ForeignKey("teams.id"), nullable=True)  # If shared with team
+    share_token = Column(String, unique=True, nullable=False, index=True)  # For public sharing
+    permission = Column(String, default="read")  # read, write, admin
+    expires_at = Column(DateTime, nullable=True)  # Optional expiration
+    is_active = Column(Boolean, default=True)
+    access_count = Column(Integer, default=0)
+    last_accessed = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    file = relationship("File", back_populates="shares")
+    shared_by = relationship("User", back_populates="file_shares", foreign_keys=[shared_by_id])
+    shared_with_user = relationship("User", foreign_keys=[shared_with_user_id])
+    shared_with_team = relationship("Team")
+
+class FileUploadSession(Base):
+    __tablename__ = "file_upload_sessions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    session_token = Column(String, unique=True, nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    file_size = Column(BigInteger, nullable=False)
+    mime_type = Column(String, nullable=False)
+    chunk_size = Column(Integer, default=1048576)  # 1MB default
+    total_chunks = Column(Integer, nullable=False)
+    uploaded_chunks = Column(JSON, nullable=True)  # Array of uploaded chunk numbers
+    status = Column(String, default="pending")  # pending, uploading, completed, failed
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+class FileAccessLog(Base):
+    __tablename__ = "file_access_logs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    file_id = Column(String, ForeignKey("files.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)  # Null for anonymous access
+    action = Column(String, nullable=False)  # upload, download, view, share, delete
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    file = relationship("File")
+    user = relationship("User")

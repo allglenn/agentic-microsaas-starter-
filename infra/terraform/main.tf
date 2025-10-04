@@ -102,6 +102,14 @@ resource "google_cloud_run_service" "api" {
           name  = "REDIS_URL"
           value = "redis://${google_redis_instance.cache.host}:6379"
         }
+        env {
+          name  = "GCS_BUCKET_NAME"
+          value = google_storage_bucket.files.name
+        }
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
       }
     }
   }
@@ -146,11 +154,62 @@ resource "google_redis_instance" "cache" {
   region         = var.region
 }
 
-# Cloud Storage bucket
+# Cloud Storage buckets
 resource "google_storage_bucket" "static" {
   name          = "${var.project_id}-static"
   location      = "US"
   force_destroy = true
+}
+
+# File storage bucket for user uploads
+resource "google_storage_bucket" "files" {
+  name          = "${var.project_id}-files"
+  location      = var.region
+  force_destroy = true
+
+  # Enable versioning for file recovery
+  versioning {
+    enabled = true
+  }
+
+  # Lifecycle management for cost optimization
+  lifecycle_rule {
+    condition {
+      age = 365
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  # CORS configuration for web uploads
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "PUT", "POST", "DELETE"]
+    response_header = ["*"]
+    max_age_seconds = 3600
+  }
+}
+
+# Service account for file operations
+resource "google_service_account" "file_storage" {
+  account_id   = "file-storage-sa"
+  display_name = "File Storage Service Account"
+  description  = "Service account for file storage operations"
+}
+
+# IAM binding for file storage service account
+resource "google_storage_bucket_iam_member" "file_storage_admin" {
+  bucket = google_storage_bucket.files.name
+  role   = "roles/storage.admin"
+  member = "serviceAccount:${google_service_account.file_storage.email}"
+}
+
+# IAM binding for Cloud Run to access file storage
+resource "google_storage_bucket_iam_member" "cloud_run_files" {
+  bucket = google_storage_bucket.files.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.file_storage.email}"
 }
 
 # IAM bindings
@@ -172,4 +231,12 @@ output "api_url" {
 
 output "database_connection_name" {
   value = google_sql_database_instance.main.connection_name
+}
+
+output "file_storage_bucket" {
+  value = google_storage_bucket.files.name
+}
+
+output "file_storage_service_account" {
+  value = google_service_account.file_storage.email
 }
