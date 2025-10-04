@@ -50,6 +50,9 @@ model User {
     Agent         Agent[]
     Task          Task[]
     ApiCall       ApiCall[]
+    StripeCustomer StripeCustomer?
+    Subscription  Subscription[]
+    Payment       Payment[]
 }
 
 model VerificationToken {
@@ -96,4 +99,60 @@ model ApiCall {
     userId    String?
     user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
     createdAt DateTime @default(now())
+}
+
+// Stripe-related models
+model StripeCustomer {
+    id                String   @id @default(cuid())
+    userId            String   @unique
+    stripeCustomerId  String   @unique
+    email             String
+    name              String?
+    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    subscriptions     Subscription[]
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+}
+
+model Subscription {
+    id                    String   @id @default(cuid())
+    userId                String
+    stripeCustomerId      String
+    stripeSubscriptionId  String   @unique
+    stripePriceId         String
+    status                String   // active, canceled, past_due, incomplete, etc.
+    currentPeriodStart    DateTime
+    currentPeriodEnd      DateTime
+    cancelAtPeriodEnd     Boolean  @default(false)
+    canceledAt            DateTime?
+    trialStart            DateTime?
+    trialEnd              DateTime?
+    user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    stripeCustomer        StripeCustomer @relation(fields: [stripeCustomerId], references: [id], onDelete: Cascade)
+    createdAt             DateTime @default(now())
+    updatedAt             DateTime @updatedAt
+}
+
+model Payment {
+    id                    String   @id @default(cuid())
+    userId                String
+    stripePaymentIntentId String   @unique
+    amount                Decimal  @db.Decimal(10, 2)
+    currency              String   @default("usd")
+    status                String   // succeeded, failed, pending, etc.
+    description           String?
+    metadata              Json?
+    user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt             DateTime @default(now())
+    updatedAt             DateTime @updatedAt
+}
+
+model WebhookEvent {
+    id            String   @id @default(cuid())
+    stripeEventId String   @unique
+    eventType     String
+    processed     Boolean  @default(false)
+    data          Json?
+    createdAt     DateTime @default(now())
+    processedAt   DateTime?
 }

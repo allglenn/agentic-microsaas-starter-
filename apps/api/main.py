@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
 from database import get_db, engine, Base
-from models import User, Agent, Task, ApiCall
+from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment
+from stripe_service import StripeService
 import logging
 # Workflow imports will be added inline
 
@@ -83,6 +84,44 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     status: str
     result: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Stripe Pydantic models
+class CheckoutSessionRequest(BaseModel):
+    price_id: str
+    success_url: str
+    cancel_url: str
+
+class CheckoutSessionResponse(BaseModel):
+    url: str
+
+class PortalSessionRequest(BaseModel):
+    return_url: str
+
+class PortalSessionResponse(BaseModel):
+    url: str
+
+class SubscriptionResponse(BaseModel):
+    id: str
+    stripe_subscription_id: str
+    status: str
+    current_period_start: datetime
+    current_period_end: datetime
+    cancel_at_period_end: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class PaymentResponse(BaseModel):
+    id: str
+    amount: float
+    currency: str
+    status: str
+    description: Optional[str]
     created_at: datetime
     
     class Config:
@@ -217,6 +256,111 @@ async def get_api_calls_analytics(
         "success_rate": (successful_calls / total_calls * 100) if total_calls > 0 else 0,
         "average_duration_ms": round(avg_duration, 2)
     }
+
+# Stripe Payment Endpoints
+@app.post("/stripe/create-checkout-session", response_model=CheckoutSessionResponse)
+async def create_checkout_session(
+    request: CheckoutSessionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a Stripe checkout session for subscription"""
+    try:
+        url = StripeService.create_checkout_session(
+            user=current_user,
+            price_id=request.price_id,
+            success_url=request.success_url,
+            cancel_url=request.cancel_url,
+            db=db
+        )
+        return CheckoutSessionResponse(url=url)
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+@app.post("/stripe/create-portal-session", response_model=PortalSessionResponse)
+async def create_portal_session(
+    request: PortalSessionRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a Stripe customer portal session"""
+    try:
+        if not current_user.stripe_customer:
+            raise HTTPException(status_code=404, detail="No Stripe customer found")
+        
+        url = StripeService.create_portal_session(
+            user=current_user,
+            return_url=request.return_url
+        )
+        return PortalSessionResponse(url=url)
+    except Exception as e:
+        logger.error(f"Error creating portal session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create portal session")
+
+@app.get("/stripe/subscriptions", response_model=List[SubscriptionResponse])
+async def get_subscriptions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's subscriptions"""
+    subscriptions = db.query(Subscription).filter(
+        Subscription.user_id == current_user.id
+    ).order_by(Subscription.created_at.desc()).all()
+    return subscriptions
+
+@app.get("/stripe/payments", response_model=List[PaymentResponse])
+async def get_payments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's payment history"""
+    payments = db.query(Payment).filter(
+        Payment.user_id == current_user.id
+    ).order_by(Payment.created_at.desc()).all()
+    return payments
+
+@app.post("/stripe/cancel-subscription/{subscription_id}")
+async def cancel_subscription(
+    subscription_id: str,
+    at_period_end: bool = True,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel a subscription"""
+    # Verify subscription belongs to user
+    subscription = db.query(Subscription).filter(
+        Subscription.id == subscription_id,
+        Subscription.user_id == current_user.id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    success = StripeService.cancel_subscription(
+        subscription_id=subscription.stripe_subscription_id,
+        at_period_end=at_period_end
+    )
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to cancel subscription")
+    
+    return {"message": "Subscription canceled successfully"}
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: dict, db: Session = Depends(get_db)):
+    """Handle Stripe webhook events"""
+    try:
+        # In production, verify the webhook signature
+        # stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        
+        success = StripeService.handle_webhook(request, db)
+        if success:
+            return {"status": "success"}
+        else:
+            raise HTTPException(status_code=400, detail="Webhook processing failed")
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail="Webhook processing failed")
 
 # Workflow Endpoints
 @app.post("/workflows/execute")
