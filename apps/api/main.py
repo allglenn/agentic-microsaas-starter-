@@ -8,8 +8,9 @@ from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
 from database import get_db, engine, Base
-from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment
+from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference
 from stripe_service import StripeService
+from email_service import EmailService
 import logging
 # Workflow imports will be added inline
 
@@ -126,6 +127,56 @@ class PaymentResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Email Pydantic models
+class EmailTemplateResponse(BaseModel):
+    id: str
+    name: str
+    subject: str
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class EmailNotificationResponse(BaseModel):
+    id: str
+    to_email: str
+    subject: str
+    status: str
+    sent_at: Optional[datetime]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class EmailPreferenceRequest(BaseModel):
+    marketing_emails: Optional[bool] = None
+    transactional_emails: Optional[bool] = None
+    product_updates: Optional[bool] = None
+    security_alerts: Optional[bool] = None
+    billing_notifications: Optional[bool] = None
+    weekly_digest: Optional[bool] = None
+
+class EmailPreferenceResponse(BaseModel):
+    id: str
+    marketing_emails: bool
+    transactional_emails: bool
+    product_updates: bool
+    security_alerts: bool
+    billing_notifications: bool
+    weekly_digest: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class SendEmailRequest(BaseModel):
+    to_email: str
+    subject: str
+    html_content: str
+    text_content: Optional[str] = None
 
 # Auth functions
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -361,6 +412,132 @@ async def stripe_webhook(request: dict, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         raise HTTPException(status_code=400, detail="Webhook processing failed")
+
+# Email Notification Endpoints
+@app.post("/email/send")
+async def send_email(
+    request: SendEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send a custom email"""
+    try:
+        success = EmailService.send_email(
+            to_email=request.to_email,
+            subject=request.subject,
+            html_content=request.html_content,
+            text_content=request.text_content,
+            user_id=current_user.id,
+            db=db
+        )
+        
+        if success:
+            return {"message": "Email sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send email")
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send email")
+
+@app.post("/email/send-template/{template_name}")
+async def send_template_email(
+    template_name: str,
+    to_email: str,
+    variables: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send an email using a template"""
+    try:
+        success = EmailService.send_template_email(
+            template_name=template_name,
+            to_email=to_email,
+            variables=variables,
+            user_id=current_user.id,
+            db=db
+        )
+        
+        if success:
+            return {"message": "Template email sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send template email")
+    except Exception as e:
+        logger.error(f"Error sending template email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send template email")
+
+@app.get("/email/templates", response_model=List[EmailTemplateResponse])
+async def get_email_templates(db: Session = Depends(get_db)):
+    """Get all email templates"""
+    templates = db.query(EmailTemplate).filter(EmailTemplate.is_active == True).all()
+    return templates
+
+@app.get("/email/notifications", response_model=List[EmailNotificationResponse])
+async def get_email_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's email notifications"""
+    notifications = db.query(EmailNotification).filter(
+        EmailNotification.user_id == current_user.id
+    ).order_by(EmailNotification.created_at.desc()).limit(50).all()
+    return notifications
+
+@app.get("/email/preferences", response_model=EmailPreferenceResponse)
+async def get_email_preferences(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's email preferences"""
+    preferences = EmailService.get_user_email_preferences(current_user.id, db)
+    
+    if not preferences:
+        # Create default preferences
+        preferences = EmailService.update_user_email_preferences(
+            user_id=current_user.id,
+            preferences={},
+            db=db
+        )
+    
+    return preferences
+
+@app.put("/email/preferences", response_model=EmailPreferenceResponse)
+async def update_email_preferences(
+    request: EmailPreferenceRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user's email preferences"""
+    try:
+        # Convert request to dict, filtering out None values
+        preferences_dict = {k: v for k, v in request.dict().items() if v is not None}
+        
+        preferences = EmailService.update_user_email_preferences(
+            user_id=current_user.id,
+            preferences=preferences_dict,
+            db=db
+        )
+        
+        return preferences
+    except Exception as e:
+        logger.error(f"Error updating email preferences: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update email preferences")
+
+@app.post("/email/test-welcome")
+async def test_welcome_email(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send a test welcome email"""
+    try:
+        success = EmailService.send_welcome_email(current_user, db)
+        
+        if success:
+            return {"message": "Welcome email sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send welcome email")
+    except Exception as e:
+        logger.error(f"Error sending welcome email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send welcome email")
 
 # Workflow Endpoints
 @app.post("/workflows/execute")

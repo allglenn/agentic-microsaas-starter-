@@ -19,6 +19,8 @@ class User(Base):
     api_calls = relationship("ApiCall", back_populates="user")
     stripe_customer = relationship("StripeCustomer", back_populates="user", uselist=False)
     subscriptions = relationship("Subscription", back_populates="user")
+    email_notifications = relationship("EmailNotification", back_populates="user")
+    email_preferences = relationship("EmailPreference", back_populates="user", uselist=False)
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -126,3 +128,53 @@ class WebhookEvent(Base):
     data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
+
+# Email-related models
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+    subject = Column(String, nullable=False)
+    html_content = Column(Text, nullable=False)
+    text_content = Column(Text, nullable=True)
+    variables = Column(JSON, nullable=True)  # Available template variables
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class EmailNotification(Base):
+    __tablename__ = "email_notifications"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    template_id = Column(String, ForeignKey("email_templates.id"), nullable=False)
+    to_email = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    html_content = Column(Text, nullable=False)
+    text_content = Column(Text, nullable=True)
+    status = Column(String, default="pending")  # pending, sent, failed, bounced
+    provider_message_id = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="email_notifications")
+    template = relationship("EmailTemplate")
+
+class EmailPreference(Base):
+    __tablename__ = "email_preferences"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True)
+    marketing_emails = Column(Boolean, default=True)
+    transactional_emails = Column(Boolean, default=True)
+    product_updates = Column(Boolean, default=True)
+    security_alerts = Column(Boolean, default=True)
+    billing_notifications = Column(Boolean, default=True)
+    weekly_digest = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="email_preferences")

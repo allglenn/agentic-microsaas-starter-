@@ -53,6 +53,8 @@ model User {
     StripeCustomer StripeCustomer?
     Subscription  Subscription[]
     Payment       Payment[]
+    EmailNotification EmailNotification[]
+    EmailPreference  EmailPreference?
 }
 
 model VerificationToken {
@@ -155,4 +157,49 @@ model WebhookEvent {
     data          Json?
     createdAt     DateTime @default(now())
     processedAt   DateTime?
+}
+
+// Email-related models
+model EmailTemplate {
+    id            String   @id @default(cuid())
+    name          String   @unique
+    subject       String
+    htmlContent   String   @db.Text
+    textContent   String?  @db.Text
+    variables     Json?
+    isActive      Boolean  @default(true)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+}
+
+model EmailNotification {
+    id                  String   @id @default(cuid())
+    userId              String
+    templateId          String
+    toEmail             String
+    subject             String
+    htmlContent         String   @db.Text
+    textContent         String?  @db.Text
+    status              String   @default("pending") // pending, sent, failed, bounced
+    providerMessageId   String?
+    errorMessage        String?  @db.Text
+    sentAt              DateTime?
+    user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    template            EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+}
+
+model EmailPreference {
+    id                    String   @id @default(cuid())
+    userId                String   @unique
+    marketingEmails       Boolean  @default(true)
+    transactionalEmails   Boolean  @default(true)
+    productUpdates        Boolean  @default(true)
+    securityAlerts        Boolean  @default(true)
+    billingNotifications  Boolean  @default(true)
+    weeklyDigest          Boolean  @default(true)
+    user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt             DateTime @default(now())
+    updatedAt             DateTime @updatedAt
 }
