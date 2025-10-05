@@ -4,10 +4,14 @@ Direct OpenAI API integration for lightweight, fast processing
 """
 import openai
 import os
+import sys
 import logging
 from typing import Dict, Any, Optional
-from database import get_db
-from models import Task, Agent
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.database import get_db
+from libs.shared.models import Task, Agent
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

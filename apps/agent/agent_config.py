@@ -70,8 +70,11 @@ def get_timeout_config() -> Dict[str, int]:
 def get_agent_settings_from_db(agent_id: str) -> Dict[str, Any]:
     """Get agent settings from database with fallback to environment config"""
     try:
-        from database import get_db
-        from models import Agent
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+        from libs.shared.database import get_db
+        from libs.shared.models import Agent
         
         db = next(get_db())
         agent = db.query(Agent).filter(Agent.id == agent_id).first()

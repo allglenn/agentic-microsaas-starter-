@@ -1,4 +1,5 @@
 import os
+import sys
 import hashlib
 import secrets
 import logging
@@ -11,8 +12,11 @@ from google.cloud import storage
 from google.cloud.exceptions import NotFound, GoogleCloudError
 from google.oauth2 import service_account
 from sqlalchemy.orm import Session
-from models import File, FileShare, FileUploadSession, FileAccessLog, User
 import json
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.models import File, FileShare, FileUploadSession, FileAccessLog, User
 
 logger = logging.getLogger(__name__)
 

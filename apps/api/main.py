@@ -9,8 +9,12 @@ import json
 from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel
-from database import get_db, engine, Base
-from models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation, File, FileShare, FileUploadSession
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from libs.shared.database import get_db, engine, Base
+from libs.shared.models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation, File, FileShare, FileUploadSession
 from stripe_service import StripeService
 from email_service import EmailService
 from team_service import TeamService

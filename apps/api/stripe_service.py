@@ -1,10 +1,14 @@
 import stripe
 import os
+import sys
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from models import User, StripeCustomer, Subscription, Payment, WebhookEvent
 from datetime import datetime
 import logging
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.models import User, StripeCustomer, Subscription, Payment, WebhookEvent
 
 logger = logging.getLogger(__name__)
 

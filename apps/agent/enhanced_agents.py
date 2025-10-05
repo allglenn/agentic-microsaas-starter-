@@ -2,12 +2,18 @@
 Enhanced Agent System with Advanced LangChain Features
 """
 import os
+import sys
 import logging
 from typing import Dict, Any, List, Optional
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain, ConversationChain, SequentialChain
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.database import get_db
+from libs.shared.models import Task, Agent
 from langchain.memory import ConversationBufferMemory, ConversationBufferWindowMemory
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType, AgentExecutor
@@ -17,8 +23,7 @@ from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.schema import Document
-from database import get_db
-from models import Task, Agent, User
+# These imports are already handled above
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

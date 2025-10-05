@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -6,8 +7,11 @@ from sqlalchemy.orm import Session
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from jinja2 import Template, Environment, FileSystemLoader
-from models import User, EmailTemplate, EmailNotification, EmailPreference
 import json
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.models import User, EmailTemplate, EmailNotification, EmailPreference
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,15 @@
 import time
+import os
+import sys
 import logging
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from database import get_db
-from models import ApiCall
 from sqlalchemy.orm import Session
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.database import get_db
+from libs.shared.models import ApiCall
 
 logger = logging.getLogger(__name__)
 

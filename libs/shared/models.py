@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
-from database import Base
+from .database import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -201,6 +201,7 @@ class Team(Base):
     owner = relationship("User", back_populates="owned_teams")
     memberships = relationship("TeamMembership", back_populates="team")
     invitations = relationship("TeamInvitation", back_populates="team")
+    files = relationship("File")
 
 class Role(Base):
     __tablename__ = "roles"

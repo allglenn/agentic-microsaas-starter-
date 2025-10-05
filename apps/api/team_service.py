@@ -1,13 +1,17 @@
 import os
+import sys
 import secrets
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from models import User, Team, Role, TeamMembership, TeamInvitation, Permission
-from email_service import EmailService
 import json
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.models import User, Team, Role, TeamMembership, TeamInvitation, Permission
+from email_service import EmailService
 
 logger = logging.getLogger(__name__)
 

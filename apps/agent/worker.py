@@ -1,11 +1,15 @@
 from celery import Celery
 import os
+import sys
 from dotenv import load_dotenv
 import logging
-from tasks import process_task, update_task_status
-from database import get_db
-from models import Task, Agent
 from sqlalchemy.orm import Session
+
+# Add project root to path for shared imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from libs.shared.database import get_db
+from libs.shared.models import Task, Agent
+from tasks import process_task, update_task_status
 
 load_dotenv()
 
