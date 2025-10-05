@@ -5,6 +5,7 @@ Advanced AI agent processing service using Celery with enhanced LangChain capabi
 ## 🚀 Enhanced Features
 
 - **Advanced LangChain Integration**: Memory, tools, chains, and agents
+- **Shared Models Architecture** - Uses `libs/shared/models.py` for all database models
 - **Specialized Agent Types**: Customer support, content writer, data analyst, etc.
 - **Memory Management**: Conversation history and context awareness
 - **Tool Integration**: Database search, calculations, email, file operations
@@ -32,6 +33,28 @@ Advanced AI agent processing service using Celery with enhanced LangChain capabi
 │   (PostgreSQL)  │    │   Functions     │    │   (GPT-4/3.5)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+## 🏗️ Shared Models Architecture
+
+This agent service uses the **shared models architecture** where all database models are defined in `libs/shared/models.py`:
+
+```python
+# Import pattern used in all agent files
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from libs.shared.database import get_db, engine, Base
+from libs.shared.models import User, Agent, Task, # ... other models as needed
+```
+
+### Key Models Used by Agent Service
+- **User** - User accounts and authentication
+- **Agent** - Agent configurations and settings
+- **Task** - Task execution and status tracking
+- **ApiCall** - API usage monitoring and metrics
+
+> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**
 
 ## 🤖 Agent Types
 

@@ -5,12 +5,37 @@ High-performance REST API built with FastAPI, featuring async support, authentic
 ## 🚀 Features
 
 - **FastAPI** with async/await support
+- **Shared Models Architecture** - Uses `libs/shared/models.py` for all database models
 - **SQLAlchemy** ORM with PostgreSQL
 - **JWT Authentication** with Bearer tokens
 - **Automatic API Documentation** (Swagger/OpenAPI)
 - **Request/Response Logging** with performance metrics
 - **CORS Support** for cross-origin requests
 - **Input Validation** with Pydantic models
+- **SaaS Features** - Stripe payments, email notifications, team management, file storage
+
+## 🏗️ Shared Models Architecture
+
+This API service uses the **shared models architecture** where all database models are defined in `libs/shared/models.py`:
+
+```python
+# Import pattern used in all API files
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from libs.shared.database import get_db, engine, Base
+from libs.shared.models import User, Agent, Task, StripeCustomer, Subscription, # ... etc
+```
+
+### Available Models (20 total)
+- **Core**: User, Agent, Task, ApiCall
+- **Stripe**: StripeCustomer, Subscription, Payment, WebhookEvent  
+- **Email**: EmailTemplate, EmailNotification, EmailPreference
+- **Teams**: Team, Role, TeamMembership, TeamInvitation, Permission
+- **Files**: File, FileShare, FileUploadSession, FileAccessLog
+
+> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**
 
 ## 🛠️ Development
 
