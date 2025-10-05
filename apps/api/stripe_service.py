@@ -1,5 +1,4 @@
 import stripe
-import os
 import sys
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -9,11 +8,13 @@ import logging
 # Add project root to path for shared imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from libs.shared.models import User, StripeCustomer, Subscription, Payment, WebhookEvent
+from libs.shared.config import get_stripe_config
 
 logger = logging.getLogger(__name__)
 
-# Configure Stripe
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+# Configure Stripe using shared config
+stripe_config = get_stripe_config()
+stripe.api_key = stripe_config["secret_key"]
 
 class StripeService:
     """Service class for handling Stripe operations"""

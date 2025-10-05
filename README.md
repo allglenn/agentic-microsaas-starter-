@@ -60,7 +60,8 @@ A comprehensive, production-ready microsaas boilerplate with AI agents, modern w
 └─────────────────┘         └─────────────────┘
 ```
 
-> **📋 [Shared Models Architecture Documentation](SHARED_MODELS_ARCHITECTURE.md)** - Complete guide to the shared models system
+> **📋 [Shared Models Architecture Documentation](SHARED_MODELS_ARCHITECTURE.md)** - Complete guide to the shared models system  
+> **🏗️ [Shared Modules Architecture Documentation](SHARED_MODULES_ARCHITECTURE.md)** - Phase 1 complete: Configuration, Authentication, and Agent modules
 
 ## 🛠️ Quick Start
 

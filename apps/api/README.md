@@ -35,7 +35,8 @@ from libs.shared.models import User, Agent, Task, StripeCustomer, Subscription, 
 - **Teams**: Team, Role, TeamMembership, TeamInvitation, Permission
 - **Files**: File, FileShare, FileUploadSession, FileAccessLog
 
-> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**
+> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**  
+> **🏗️ [Shared Modules Architecture](../../SHARED_MODULES_ARCHITECTURE.md)** - Configuration, Authentication, and Agent modules
 
 ## 🛠️ Development
 

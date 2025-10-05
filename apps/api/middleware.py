@@ -1,7 +1,6 @@
 import time
 import os
 import sys
-import logging
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
@@ -10,8 +9,11 @@ from sqlalchemy.orm import Session
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from libs.shared.database import get_db
 from libs.shared.models import ApiCall
+from libs.shared.logging_config import get_api_logger
+from libs.shared.monitoring import APIMonitor
 
-logger = logging.getLogger(__name__)
+# Initialize logger
+logger = get_api_logger()
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -23,7 +25,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         # Calculate duration
         duration = int((time.time() - start_time) * 1000)  # Convert to milliseconds
         
-        # Log API call
+        # Log API call using shared monitoring
         try:
             db = next(get_db())
             api_call = ApiCall(
@@ -39,9 +41,12 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         finally:
             db.close()
         
-        # Log request
-        logger.info(
-            f"{request.method} {request.url.path} - {response.status_code} - {duration}ms"
+        # Log request using structured logging
+        logger.log_api_call(
+            endpoint=str(request.url.path),
+            method=request.method,
+            status_code=response.status_code,
+            duration_ms=duration
         )
         
         return response

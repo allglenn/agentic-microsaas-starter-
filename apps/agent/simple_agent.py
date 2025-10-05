@@ -2,22 +2,21 @@
 Simple Agent System - No LangChain Dependencies
 Direct OpenAI API integration for lightweight, fast processing
 """
-import openai
 import os
 import sys
-import logging
 from typing import Dict, Any, Optional
 
 # Add project root to path for shared imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from libs.shared.database import get_db
 from libs.shared.models import Task, Agent
+from libs.shared.logging_config import get_agent_logger
+from libs.shared.openai_config import create_chat_completion, OpenAIError
+from libs.shared.monitoring import monitor_task_execution
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
-
-# Configure OpenAI
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize logger
+logger = get_agent_logger()
 
 class SimpleAgent:
     """Simple agent using direct OpenAI API calls"""
@@ -28,29 +27,36 @@ class SimpleAgent:
         self.temperature = agent_config.get('temperature', 0.7)
         self.max_tokens = agent_config.get('max_tokens', 1000)
     
+    @monitor_task_execution("simple_agent_process_task", user_id=None)
     def process_task(self, task: Task, context: Optional[Dict] = None) -> str:
-        """Process a task using direct OpenAI API"""
+        """Process a task using shared OpenAI configuration"""
         try:
             # Build the prompt
             prompt = self._build_prompt(task, context)
             
-            # Call OpenAI API directly
-            response = openai.ChatCompletion.create(
+            # Use shared OpenAI configuration
+            messages = [
+                {"role": "system", "content": self.agent_config.get('prompt', 'You are a helpful AI assistant.')},
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = create_chat_completion(
+                messages=messages,
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": self.agent_config.get('prompt', 'You are a helpful AI assistant.')},
-                    {"role": "user", "content": prompt}
-                ],
                 temperature=self.temperature,
-                max_tokens=self.max_tokens
+                max_tokens=self.max_tokens,
+                user_id=task.user_id
             )
             
-            result = response.choices[0].message.content.strip()
-            logger.info(f"Task processed successfully: {task.id}")
+            result = response["content"]
+            logger.info(f"Task processed successfully: {task.id}", task_id=task.id, user_id=task.user_id)
             return result
             
+        except OpenAIError as e:
+            logger.error(f"OpenAI error processing task {task.id}: {str(e)}", task_id=task.id, error_code=e.error_code)
+            return f"OpenAI error: {str(e)}"
         except Exception as e:
-            logger.error(f"Error processing task {task.id}: {str(e)}")
+            logger.error(f"Error processing task {task.id}: {str(e)}", task_id=task.id)
             return f"Error processing task: {str(e)}"
     
     def _build_prompt(self, task: Task, context: Optional[Dict] = None) -> str:

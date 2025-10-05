@@ -1,4 +1,3 @@
-import os
 import sys
 import logging
 from typing import Optional, Dict, Any, List
@@ -12,11 +11,13 @@ import json
 # Add project root to path for shared imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from libs.shared.models import User, EmailTemplate, EmailNotification, EmailPreference
+from libs.shared.config import get_sendgrid_config
 
 logger = logging.getLogger(__name__)
 
-# Configure SendGrid
-sendgrid_client = SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
+# Configure SendGrid using shared config
+sendgrid_config = get_sendgrid_config()
+sendgrid_client = SendGridAPIClient(api_key=sendgrid_config["api_key"])
 
 # Jinja2 environment for template rendering
 template_env = Environment(loader=FileSystemLoader("templates"))

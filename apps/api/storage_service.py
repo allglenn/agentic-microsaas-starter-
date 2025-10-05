@@ -1,4 +1,3 @@
-import os
 import sys
 import hashlib
 import secrets
@@ -17,6 +16,7 @@ import json
 # Add project root to path for shared imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from libs.shared.models import File, FileShare, FileUploadSession, FileAccessLog, User
+from libs.shared.config import get_gcp_config
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,16 @@ class StorageService:
     """Service class for handling file storage operations with Google Cloud Storage"""
     
     def __init__(self):
-        self.bucket_name = os.getenv("GCS_BUCKET_NAME")
-        self.project_id = os.getenv("GCP_PROJECT_ID")
+        # Get GCP configuration from shared config
+        gcp_config = get_gcp_config()
+        self.bucket_name = gcp_config["bucket_name"]
+        self.project_id = gcp_config["project_id"]
         
         # Initialize GCS client
-        if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        if gcp_config.get("credentials_path"):
             # Use service account key file
             credentials = service_account.Credentials.from_service_account_file(
-                os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                gcp_config["credentials_path"]
             )
             self.client = storage.Client(credentials=credentials, project=self.project_id)
         else:

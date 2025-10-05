@@ -4,10 +4,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
-import os
 import json
 from datetime import datetime, timedelta
-import jwt
 from pydantic import BaseModel
 import sys
 import os
@@ -15,19 +13,24 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from libs.shared.database import get_db, engine, Base
 from libs.shared.models import User, Agent, Task, ApiCall, StripeCustomer, Subscription, Payment, EmailTemplate, EmailNotification, EmailPreference, Team, Role, TeamMembership, TeamInvitation, File, FileShare, FileUploadSession
+from libs.shared.config import get_api_config, get_security_config
+from libs.shared.auth import verify_token as verify_jwt_token, get_user_id_from_token, create_access_token
+from libs.shared.logging_config import get_api_logger
+from libs.shared.monitoring import monitor_api_call, get_health_status, get_performance_metrics
 from stripe_service import StripeService
 from email_service import EmailService
 from team_service import TeamService
 from storage_service import StorageService
-import logging
 # Workflow imports will be added inline
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Initialize logger
+logger = get_api_logger()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Get configuration from shared config
+api_config = get_api_config()
 
 app = FastAPI(
     title="Agentic MicroSaaS API",
@@ -38,7 +41,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://yourdomain.com"],
+    allow_origins=api_config["cors_origins"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -317,16 +320,22 @@ class StorageStatsResponse(BaseModel):
 
 # Auth functions
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token and return user ID"""
     try:
-        payload = jwt.decode(credentials.credentials, os.getenv("API_SECRET_KEY", "secret"), algorithms=["HS256"])
-        user_id: str = payload.get("sub")
+        payload = verify_jwt_token(credentials.credentials)
+        if payload is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_id = payload.get("user_id")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+        
         return user_id
-    except jwt.PyJWTError:
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def get_current_user(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Get current user from database"""
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -338,8 +347,18 @@ async def root():
     return {"message": "Agentic MicroSaaS API", "status": "healthy"}
 
 @app.get("/health")
+@monitor_api_call("/health", "GET")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow()}
+    """Health check endpoint with monitoring"""
+    health_status = get_health_status()
+    return health_status
+
+@app.get("/metrics")
+@monitor_api_call("/metrics", "GET")
+async def get_metrics():
+    """Get performance metrics endpoint"""
+    metrics = get_performance_metrics()
+    return metrics
 
 # User routes
 @app.post("/users", response_model=UserResponse)
