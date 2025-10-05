@@ -2,14 +2,24 @@ SHELL := /bin/bash
 PROJECT_ID := agentic-microsaas
 REGION := europe-west1
 
-.PHONY: dev.up web.dev api.dev agent.dev tf.init tf.apply cr.deploy sql.init fmt clean
+.PHONY: dev.up dev.stop web.dev api.dev agent.dev tf.init tf.apply cr.deploy sql.init fmt clean
 
 dev.up:
 	@echo "Starting local infrastructure with Docker Compose..."
-	docker-compose up -d postgres redis
+	docker compose up -d postgres redis
 	@echo "Waiting for services to be ready..."
 	sleep 10
 	@echo "Infrastructure is ready!"
+
+dev.stop:
+	@echo "Stopping local development environment..."
+	@echo "Killing processes on development ports..."
+	-lsof -ti:3000 | xargs kill -9 2>/dev/null || echo "No process on port 3000"
+	-lsof -ti:8000 | xargs kill -9 2>/dev/null || echo "No process on port 8000"
+	-lsof -ti:5555 | xargs kill -9 2>/dev/null || echo "No process on port 5555"
+	@echo "Stopping Docker infrastructure..."
+	docker compose down
+	@echo "Development environment stopped!"
 
 web.dev:
 	@echo "Starting Next.js development server..."
@@ -89,35 +99,35 @@ tf.destroy:
 cr.deploy.dev:
 	@echo "Deploying to Google Cloud Run (Development)..."
 	@echo "Building and pushing images..."
-	gcloud builds submit --tag gcr.io/agentic-microsaas-dev/web apps/web
-	gcloud builds submit --tag gcr.io/agentic-microsaas-dev/api apps/api
-	gcloud builds submit --tag gcr.io/agentic-microsaas-dev/agent apps/agent
+	gcloud builds submit --tag gcr.io/lorelink-ai-dev/web apps/web
+	gcloud builds submit --tag gcr.io/lorelink-ai-dev/api apps/api
+	gcloud builds submit --tag gcr.io/lorelink-ai-dev/agent apps/agent
 	@echo "Deploying services..."
-	gcloud run deploy agentic-microsaas-dev-web --image gcr.io/agentic-microsaas-dev/web --project=agentic-microsaas-dev --region=$(REGION) --allow-unauthenticated
-	gcloud run deploy agentic-microsaas-dev-api --image gcr.io/agentic-microsaas-dev/api --project=agentic-microsaas-dev --region=$(REGION)
-	gcloud run deploy agentic-microsaas-dev-agent --image gcr.io/agentic-microsaas-dev/agent --project=agentic-microsaas-dev --region=$(REGION)
+	gcloud run deploy lorelink-ai-dev-web --image gcr.io/lorelink-ai-dev/web --project=lorelink-ai-dev --region=$(REGION) --allow-unauthenticated
+	gcloud run deploy lorelink-ai-dev-api --image gcr.io/lorelink-ai-dev/api --project=lorelink-ai-dev --region=$(REGION)
+	gcloud run deploy lorelink-ai-dev-agent --image gcr.io/lorelink-ai-dev/agent --project=lorelink-ai-dev --region=$(REGION)
 
 cr.deploy.staging:
 	@echo "Deploying to Google Cloud Run (Staging)..."
 	@echo "Building and pushing images..."
-	gcloud builds submit --tag gcr.io/agentic-microsaas-staging/web apps/web
-	gcloud builds submit --tag gcr.io/agentic-microsaas-staging/api apps/api
-	gcloud builds submit --tag gcr.io/agentic-microsaas-staging/agent apps/agent
+	gcloud builds submit --tag gcr.io/lorelink-ai-staging/web apps/web
+	gcloud builds submit --tag gcr.io/lorelink-ai-staging/api apps/api
+	gcloud builds submit --tag gcr.io/lorelink-ai-staging/agent apps/agent
 	@echo "Deploying services..."
-	gcloud run deploy agentic-microsaas-staging-web --image gcr.io/agentic-microsaas-staging/web --project=agentic-microsaas-staging --region=$(REGION) --allow-unauthenticated
-	gcloud run deploy agentic-microsaas-staging-api --image gcr.io/agentic-microsaas-staging/api --project=agentic-microsaas-staging --region=$(REGION)
-	gcloud run deploy agentic-microsaas-staging-agent --image gcr.io/agentic-microsaas-staging/agent --project=agentic-microsaas-staging --region=$(REGION)
+	gcloud run deploy lorelink-ai-staging-web --image gcr.io/lorelink-ai-staging/web --project=lorelink-ai-staging --region=$(REGION) --allow-unauthenticated
+	gcloud run deploy lorelink-ai-staging-api --image gcr.io/lorelink-ai-staging/api --project=lorelink-ai-staging --region=$(REGION)
+	gcloud run deploy lorelink-ai-staging-agent --image gcr.io/lorelink-ai-staging/agent --project=lorelink-ai-staging --region=$(REGION)
 
 cr.deploy.prod:
 	@echo "Deploying to Google Cloud Run (Production)..."
 	@echo "Building and pushing images..."
-	gcloud builds submit --tag gcr.io/agentic-microsaas-prod/web apps/web
-	gcloud builds submit --tag gcr.io/agentic-microsaas-prod/api apps/api
-	gcloud builds submit --tag gcr.io/agentic-microsaas-prod/agent apps/agent
+	gcloud builds submit --tag gcr.io/lorelink-ai-prod/web apps/web
+	gcloud builds submit --tag gcr.io/lorelink-ai-prod/api apps/api
+	gcloud builds submit --tag gcr.io/lorelink-ai-prod/agent apps/agent
 	@echo "Deploying services..."
-	gcloud run deploy agentic-microsaas-prod-web --image gcr.io/agentic-microsaas-prod/web --project=agentic-microsaas-prod --region=$(REGION) --allow-unauthenticated
-	gcloud run deploy agentic-microsaas-prod-api --image gcr.io/agentic-microsaas-prod/api --project=agentic-microsaas-prod --region=$(REGION)
-	gcloud run deploy agentic-microsaas-prod-agent --image gcr.io/agentic-microsaas-prod/agent --project=agentic-microsaas-prod --region=$(REGION)
+	gcloud run deploy lorelink-ai-prod-web --image gcr.io/lorelink-ai-prod/web --project=lorelink-ai-prod --region=$(REGION) --allow-unauthenticated
+	gcloud run deploy lorelink-ai-prod-api --image gcr.io/lorelink-ai-prod/api --project=lorelink-ai-prod --region=$(REGION)
+	gcloud run deploy lorelink-ai-prod-agent --image gcr.io/lorelink-ai-prod/agent --project=lorelink-ai-prod --region=$(REGION)
 
 # Legacy command for backward compatibility
 cr.deploy:
@@ -136,7 +146,7 @@ fmt:
 
 clean:
 	@echo "Cleaning up..."
-	docker-compose down -v
+	docker compose -f docker-compose.infrastructure.yml down -v
 	docker system prune -f
 
 install:
@@ -155,6 +165,7 @@ help:
 	@echo ""
 	@echo "Local Development:"
 	@echo "  dev.up      - Start local infrastructure (PostgreSQL + Redis)"
+	@echo "  dev.stop    - Stop local development environment"
 	@echo "  web.dev     - Start Next.js development server"
 	@echo "  api.dev     - Start FastAPI development server"
 	@echo "  agent.dev   - Start Celery worker"
