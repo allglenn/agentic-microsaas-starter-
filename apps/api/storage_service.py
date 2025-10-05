@@ -43,7 +43,7 @@ class StorageService:
         user: User,
         team_id: Optional[str] = None,
         is_public: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
+        file_metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
         db: Session = None
     ) -> File:
@@ -69,7 +69,7 @@ class StorageService:
             blob.upload_from_string(
                 file_content,
                 content_type=mime_type,
-                metadata={
+                file_metadata={
                     "original_filename": filename,
                     "user_id": user.id,
                     "team_id": team_id or "",
@@ -92,7 +92,7 @@ class StorageService:
                 mime_type=mime_type,
                 file_hash=file_hash,
                 is_public=is_public,
-                metadata=metadata or {},
+                file_metadata=file_metadata or {},
                 tags=tags or []
             )
             
@@ -491,7 +491,7 @@ class StorageService:
                 action=action,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                metadata={"share_token": share_token} if share_token else None
+                access_metadata={"share_token": share_token} if share_token else None
             )
             db.add(access_log)
             db.commit()

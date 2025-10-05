@@ -248,7 +248,7 @@ class FileUploadRequest(BaseModel):
     team_id: Optional[str] = None
     is_public: bool = False
     tags: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    file_metadata: Optional[Dict[str, Any]] = None
 
 class FileResponse(BaseModel):
     id: str
@@ -916,7 +916,7 @@ async def upload_file(
     team_id: Optional[str] = Form(None),
     is_public: bool = Form(False),
     tags: Optional[str] = Form(None),  # JSON string
-    metadata: Optional[str] = Form(None),  # JSON string
+    file_metadata: Optional[str] = Form(None),  # JSON string
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -924,7 +924,7 @@ async def upload_file(
     try:
         # Parse tags and metadata
         tags_list = json.loads(tags) if tags else None
-        metadata_dict = json.loads(metadata) if metadata else None
+        metadata_dict = json.loads(file_metadata) if file_metadata else None
         
         # Read file content
         file_content = await file.read()
@@ -937,7 +937,7 @@ async def upload_file(
             user=current_user,
             team_id=team_id,
             is_public=is_public,
-            metadata=metadata_dict,
+            file_metadata=metadata_dict,
             tags=tags_list,
             db=db
         )

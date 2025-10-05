@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Boolean, Text, ForeignKey, Integer, Numeric, JSON
+from sqlalchemy import Column, String, DateTime, Boolean, Text, ForeignKey, Integer, BigInteger, Numeric, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -118,7 +118,7 @@ class Payment(Base):
     currency = Column(String, default="usd", nullable=False)
     status = Column(String, nullable=False)  # succeeded, failed, pending, etc.
     description = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    payment_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -290,7 +290,7 @@ class File(Base):
     file_hash = Column(String, nullable=False)  # For deduplication
     is_public = Column(Boolean, default=False)
     is_encrypted = Column(Boolean, default=False)
-    metadata = Column(JSON, nullable=True)  # Additional file metadata
+    file_metadata = Column(JSON, nullable=True)  # Additional file metadata
     tags = Column(JSON, nullable=True)  # File tags for organization
     download_count = Column(Integer, default=0)
     last_accessed = Column(DateTime, nullable=True)
@@ -351,7 +351,7 @@ class FileAccessLog(Base):
     action = Column(String, nullable=False)  # upload, download, view, share, delete
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    access_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     file = relationship("File")
