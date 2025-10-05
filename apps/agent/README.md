@@ -54,7 +54,8 @@ from libs.shared.models import User, Agent, Task, # ... other models as needed
 - **Task** - Task execution and status tracking
 - **ApiCall** - API usage monitoring and metrics
 
-> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**
+> **📋 [Complete Shared Models Documentation](../../SHARED_MODELS_ARCHITECTURE.md)**  
+> **🏗️ [Shared Modules Architecture](../../SHARED_MODULES_ARCHITECTURE.md)** - Configuration, Authentication, and Agent modules
 
 ## 🤖 Agent Types
 
